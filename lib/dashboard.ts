@@ -80,3 +80,19 @@ export async function getNotifications(sub: string, city: string | null) {
       order by j.posted_at desc, j.id limit 8`),
   ];
 }
+
+export type SavedJob = { id: string; title: string; company: string; url: string };
+
+// Left panel: jobs you saved, and skills you started learning.
+export async function getSavedAndStarted(sub: string) {
+  const [saved, started] = await Promise.all([
+    sql<SavedJob[]>`
+      select j.id, j.title, c.name as company, j.url
+      from saved_jobs sj join jobs j on j.id = sj.job_id join companies c on c.id = j.company_id
+      where sj.user_sub = ${sub} order by sj.saved_at desc`,
+    sql<MySkill[]>`
+      select s.id, s.slug, s.name, s.category from user_skills us join skills s on s.id = us.skill_id
+      where us.user_sub = ${sub} and us.status = 'learning' order by s.name`,
+  ]);
+  return { saved: [...saved], started: [...started] };
+}

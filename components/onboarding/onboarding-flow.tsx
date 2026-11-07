@@ -55,7 +55,7 @@ export function OnboardingFlow({ firstName, skills, cities, initial }: Props) {
   }
 
   return (
-    <Card>
+    <Card className="glass glass-in mt-6 border-0 bg-transparent">
       <CardHeader>
         <p className="text-sm text-muted-foreground">Step {step} of 3</p>
         <CardTitle className="text-2xl">

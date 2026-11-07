@@ -36,6 +36,7 @@ export async function DELETE() {
   if (!session) return new Response("Sign in first", { status: 401 });
   await sql.begin(async (tx) => {
     await tx`delete from user_skills where user_sub = ${session.user.sub}`;
+    await tx`delete from saved_jobs where user_sub = ${session.user.sub}`;
     await tx`delete from profiles where user_sub = ${session.user.sub}`;
   });
   return Response.json({ ok: true });

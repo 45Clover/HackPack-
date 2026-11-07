@@ -6,10 +6,8 @@ import { notFound } from "next/navigation";
 import { CATEGORIES } from "@/lib/categories";
 import { matchSkills } from "@/lib/resume";
 import { parseLocation } from "@/lib/location";
-import type { GraphJob, GraphLink, Leader, MySkill, NextSkill } from "@/lib/dashboard";
-import { ProfileCard } from "@/components/dashboard/profile-card";
-import { PersonalGraph } from "@/components/dashboard/personal-graph";
-import { Leaderboard } from "@/components/dashboard/leaderboard";
+import type { GraphJob, GraphLink, Leader, MySkill } from "@/lib/dashboard";
+import { DashboardShell } from "@/components/dashboard/dashboard-shell";
 
 const BOARDS = { benevity: "Benevity", neofinancial: "Neo Financial", jobber: "Jobber", cohere: "Cohere" };
 const SAMPLE_RESUME = ["JavaScript", "TypeScript", "React", "Node.js", "SQL", "PostgreSQL", "Git", "Python"];
@@ -22,7 +20,8 @@ const DICT = CATEGORIES.flatMap((c, ci) =>
 
 type AshbyJob = { id: string; title: string; jobUrl: string; location: string; isRemote: boolean; publishedAt: string; descriptionPlain?: string; isListed: boolean };
 
-export default async function Preview() {
+export default async function Preview({ searchParams }: PageProps<"/preview">) {
+  const { focus } = await searchParams;
   if (process.env.NODE_ENV !== "development") notFound();
 
   const feeds = await Promise.all(
@@ -57,32 +56,26 @@ export default async function Preview() {
   }
   const leaders = [...counts.values()].sort((a, b) => b.jobs - a.jobs).slice(0, 10);
 
-  const missing = new Map<string, { slug: string; name: string; jobs: number }>();
-  for (const { links } of closest) for (const l of links) if (!l.has) {
-    const m = missing.get(l.slug) ?? { slug: l.slug, name: l.name, jobs: 0 };
-    m.jobs++;
-    missing.set(l.slug, m);
-  }
-  const nextSkill: NextSkill = [...missing.values()].sort((a, b) => b.jobs - a.jobs)[0] ?? null;
-
   return (
-    <div className="space-y-4">
-      <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm">
+    <>
+      <p className="glass relative z-20 mb-4 px-4 py-2.5 text-sm">
         <strong>Design preview (dev only).</strong> {scored.length} real job posts fetched live from {Object.values(BOARDS).join(", ")}. Skills matched by keyword, not Gemini. &quot;You&quot; is a sample resume.{" "}
-        <Link href="/preview/onboarding" className="underline underline-offset-4">See onboarding →</Link>
+        <Link href="/preview/onboarding" className="underline underline-offset-4">See onboarding</Link>
       </p>
-      <main className="grid gap-4 lg:grid-cols-[1fr_3fr_1fr]">
-        <aside className="space-y-4">
-          <ProfileCard user={{ name: "Sample Student", picture: null }} role="Full-stack developer" city="Calgary" skills={mine} nextSkill={nextSkill} />
-        </aside>
-        <section className="min-w-0 space-y-3">
-          <h1 className="text-xl font-semibold tracking-tight">You, your skills, and the jobs you&apos;re closest to</h1>
-          <PersonalGraph mine={mine} jobs={closest.map((c) => c.job)} links={closest.flatMap((c) => c.links)} />
-        </section>
-        <aside className="space-y-4">
-          <Leaderboard area="Canada" leaders={leaders} />
-        </aside>
-      </main>
-    </div>
+      <DashboardShell
+        user={{ name: "Sample Student", picture: null }}
+        role="Full-stack developer"
+        scope={{ kind: "canada", city: "Calgary" }}
+        cities={["Calgary"]}
+        mine={mine}
+        jobs={closest.map((c) => c.job)}
+        links={closest.flatMap((c) => c.links)}
+        leaders={leaders}
+        saved={[]}
+        started={[]}
+        persist={false}
+        initialFocus={typeof focus === "string" ? focus : undefined}
+      />
+    </>
   );
 }
