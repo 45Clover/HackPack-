@@ -1,7 +1,6 @@
 // DEV-ONLY design preview: the dashboard without Auth0 or the database.
 // Real job posts fetched live from public feeds, skills matched by keyword (not Gemini), and a sample resume.
 // shortcut: throwaway preview for design work; delete once the real dashboard runs on real data.
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { CATEGORIES } from "@/lib/categories";
 import { matchSkills } from "@/lib/resume";
@@ -58,10 +57,6 @@ export default async function Preview({ searchParams }: PageProps<"/preview">) {
 
   return (
     <>
-      <p className="surface fixed bottom-[88px] left-1/2 z-20 hidden -translate-x-1/2 rounded-full px-4 py-1.5 text-xs text-muted-foreground lg:block">
-        <strong className="text-foreground">Dev preview</strong> · {scored.length} live job posts from {Object.values(BOARDS).join(", ")} · keyword skills · sample resume ·{" "}
-        <Link href="/preview/onboarding" className="underline underline-offset-4">See onboarding</Link>
-      </p>
       <DashboardShell
         user={{ name: "Sample Student", picture: null }}
         role="Full-stack developer"

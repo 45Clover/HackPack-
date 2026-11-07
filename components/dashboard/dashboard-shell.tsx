@@ -12,11 +12,11 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
-  DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
+  DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuLabel, DropdownMenuRadioGroup, DropdownMenuRadioItem,
+  DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { ScopeSwitch } from "@/components/scope-switch";
 import { CATEGORIES, categoryColor } from "@/lib/categories";
 import { ago } from "@/lib/ago";
 import type { GraphJob, GraphLink, Leader, MySkill, SavedJob } from "@/lib/dashboard";
@@ -71,26 +71,22 @@ export function DashboardShell({ user, role, scope, cities, mine, jobs, links, l
   const [leftOpen, setLeftOpen] = useState(initialSidebarOpen);
   const [currentSlug, setCurrentSlug] = useState<string | null>(null);
   const [view, setView] = useState<"map" | "tree">(initialView);
+  const [hoverId, setHoverId] = useState<string | null>(null);
   const [projectUrl, setProjectUrl] = useState("");
   const [hidden, setHidden] = useState<Set<string>>(new Set());
   const [error, setError] = useState("");
 
-  // The graph: you → your skills; each job → the skills it asks for.
+  // The 3D map: jobs and the skills they ask for. Your skills show as filled spheres; missing ones as rings.
   const data = useMemo(() => {
-    const nodes = new Map<string, GNode>([["me", { id: "me", kind: "me", label: "You", fx: 0, fy: 0, fz: 0 }]]);
+    const nodes = new Map<string, GNode>();
     const edges: GLink[] = [];
-    const addSkill = (s: Skill) => nodes.set(`s:${s.slug}`, { id: `s:${s.slug}`, kind: "skill", label: s.name, slug: s.slug, category: s.category });
-    for (const s of mine) {
-      addSkill(s);
-      edges.push({ source: "me", target: `s:${s.slug}`, kind: "mine" });
-    }
     for (const j of jobs) nodes.set(`j:${j.id}`, { id: `j:${j.id}`, kind: "job", label: `${j.title} · ${j.company}`, jobId: j.id });
     for (const l of links) {
-      if (!nodes.has(`s:${l.slug}`)) addSkill({ id: l.skill_id, slug: l.slug, name: l.name, category: l.category });
+      if (!nodes.has(`s:${l.slug}`)) nodes.set(`s:${l.slug}`, { id: `s:${l.slug}`, kind: "skill", label: l.name, slug: l.slug, category: l.category });
       edges.push({ source: `j:${l.job_id}`, target: `s:${l.slug}`, kind: l.has ? "has" : "missing" });
     }
     return { nodes: [...nodes.values()], links: edges };
-  }, [mine, jobs, links]);
+  }, [jobs, links]);
 
   // Match scores and "next skill" follow what you've marked, live.
   const matchOf = (jobId: string) => {
@@ -146,6 +142,14 @@ export function DashboardShell({ user, role, scope, cities, mine, jobs, links, l
   }
 
   const select = (id: string) => setSelected(data.nodes.find((n) => n.id === id) ?? null);
+  const setArea = (kind: "city" | "canada", city = scope.city) => router.push(`?${new URLSearchParams({ scope: kind, city })}`);
+  // Hovering a row lights up its node; keyboard focus does the same.
+  const rowHover = (id: string) => ({
+    onMouseEnter: () => setHoverId(id),
+    onMouseLeave: () => setHoverId(null),
+    onFocus: () => setHoverId(id),
+    onBlur: () => setHoverId(null),
+  });
   const startedList = [...learning];
   const learningNow = currentSlug && learning.has(currentSlug) ? currentSlug : startedList[startedList.length - 1] ?? null;
   const projectOk = /^https?:\/\/\S+\.\S+/.test(projectUrl.trim());
@@ -165,30 +169,41 @@ export function DashboardShell({ user, role, scope, cities, mine, jobs, links, l
   const visibleLeaders = leaders.filter((l) => !hidden.has(l.category ?? ""));
   const initials = user.name.split(/\s+/).map((w) => w[0]).join("").slice(0, 2).toUpperCase();
 
-  const card = selectedJob ? (
-    <JobCard job={selectedJob} match={matchOf(selectedJob.id)} isSaved={saved.some((s) => s.id === selectedJob.id)} onSave={() => toggleSaved(selectedJob)} />
-  ) : selectedSkill ? (
-    <SkillCard
-      skill={selectedSkill}
-      status={have.has(selectedSkill.slug) ? "have" : learning.has(selectedSkill.slug) ? "learning" : "none"}
-      onStart={() => { setSkillStatus(selectedSkill.slug, "learning"); setCurrentSlug(selectedSkill.slug); }}
-      onFinish={() => { setCurrentSlug(selectedSkill.slug); document.getElementById("project-url")?.focus(); }}
-    />
-  ) : null;
+
+  const mini = (n: GNode) => {
+    if (n.kind === "job") {
+      const j = jobs.find((x) => x.id === n.jobId);
+      const m = j ? matchOf(j.id) : null;
+      return (
+        <>
+          <span className="block truncate font-medium">{j?.title}</span>
+          <span className="block truncate text-muted-foreground">{j?.company}{m && ` · ${m.have}/${m.needed} skills`}</span>
+        </>
+      );
+    }
+    const owned = !!n.slug && have.has(n.slug);
+    return (
+      <span className="flex items-center gap-1.5">
+        <span aria-hidden className="size-2 shrink-0 rounded-full" style={{ background: categoryColor(n.category) }} />
+        <span className="truncate font-medium">{n.label}</span>
+        <span className={owned ? "text-[var(--have)]" : "text-muted-foreground"}>{owned ? "have" : "missing"}</span>
+      </span>
+    );
+  };
 
   return (
     <>
       <div className="scene-bg fixed inset-0 z-0" aria-hidden="true">
         {view === "map" && (
         <GraphBoundary>
-          <Graph3D data={data} have={have} learning={learning} hidden={hidden} selectedId={selected?.id ?? null} onSelect={setSelected} card={card} width={width} height={height} />
+          <Graph3D data={data} have={have} learning={learning} hidden={hidden} selectedId={selected?.id ?? null} onSelect={setSelected} hoverId={hoverId} mini={mini} width={width} height={height} />
         </GraphBoundary>
         )}
       </div>
 
       {/* 2D view: the skill tree, in the space between the panels. */}
       {view === "tree" && (
-        <div className="relative z-[5] overflow-auto lg:fixed lg:top-[190px] lg:right-[calc(clamp(270px,19.8vw,350px)+16px)] lg:bottom-[84px] lg:left-[calc(clamp(250px,18.6vw,330px)+16px)]">
+        <div className="relative z-[5] flex flex-col-reverse overflow-auto lg:fixed lg:top-[132px] lg:right-[calc(clamp(270px,19.8vw,350px)+16px)] lg:bottom-[78px] lg:left-[calc(clamp(250px,18.6vw,330px)+16px)]">
           <SkillTree
             skills={[...skills.values()]}
             have={have}
@@ -326,7 +341,9 @@ export function DashboardShell({ user, role, scope, cities, mine, jobs, links, l
             <p className="mt-1 text-sm text-muted-foreground">
               {scope.kind === "canada" ? "Canada" : scope.city} · {jobs.length} closest jobs · {have.size} skills
             </p>
-            <div className="pointer-events-auto mt-3 inline-flex rounded-full bg-white p-1 shadow-[0_1px_2px_rgb(20_20_19/0.06)]" role="group" aria-label="View">
+          </div>
+          {/* 3D map / Skill tree switch, bottom-right corner of the screen */}
+          <div className="surface pointer-events-auto fixed right-5 bottom-5 z-20 hidden rounded-full p-1 lg:inline-flex" role="group" aria-label="View">
               {(["map", "tree"] as const).map((v) => (
                 <button
                   key={v}
@@ -338,7 +355,6 @@ export function DashboardShell({ user, role, scope, cities, mine, jobs, links, l
                 </button>
               ))}
             </div>
-          </div>
           <nav aria-label="Focus one category" className="surface pointer-events-auto hidden max-w-[calc(100vw-clamp(250px,18.6vw,330px)-clamp(270px,19.8vw,350px)-48px)] items-center gap-0.5 overflow-x-auto rounded-full p-1.5 [scrollbar-width:none] lg:fixed lg:bottom-5 lg:left-1/2 lg:flex lg:-translate-x-1/2">
             {[{ slug: "all", name: "All" }, ...CATEGORIES.filter((c) => [...skills.values()].some((sk) => sk.category === c.slug))].map((c) => {
               const active = c.slug === "all" ? hidden.size === 0 : hidden.size === CATEGORIES.length - 1 && !hidden.has(c.slug);
@@ -358,20 +374,39 @@ export function DashboardShell({ user, role, scope, cities, mine, jobs, links, l
         </div>
 
         {/* RIGHT: leaderboard / closest jobs, or "overall info" for the selected node */}
-        <aside className="surface rise-in pointer-events-auto flex flex-col gap-5 overflow-y-auto p-6 lg:fixed lg:top-[122px] lg:right-0 lg:bottom-0 lg:w-[clamp(270px,19.8vw,350px)] lg:rounded-none lg:rounded-tl-[40px]">
+        <aside className="surface rise-in pointer-events-auto flex flex-col gap-5 overflow-y-auto p-6 lg:fixed lg:top-[122px] lg:right-0 lg:bottom-0 lg:w-[clamp(270px,19.8vw,350px)] lg:rounded-none lg:rounded-tl-[40px] lg:pb-24">
           <div className="flex items-center justify-between gap-2">
             {selected ? (
               <button className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground" onClick={() => setSelected(null)}>
                 <ArrowLeftIcon className="size-4" />Overall info
               </button>
             ) : (
-              <h2 className="text-xl font-medium tracking-tight">Leaderboard</h2>
+              <div>
+                <h2 className="text-xl font-medium tracking-tight">Leaderboard</h2>
+                <p className="text-sm text-muted-foreground">{scope.kind === "canada" ? "All of Canada" : scope.city}</p>
+              </div>
             )}
             <DropdownMenu>
-              <DropdownMenuTrigger className={buttonVariants({ variant: "ghost", size: "icon" })} aria-label="Filter categories">
+              <DropdownMenuTrigger className={buttonVariants({ variant: "ghost", size: "icon" })} aria-label="Filter: area and categories">
                 <SlidersHorizontalIcon />
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuContent align="end" className="w-60">
+                <DropdownMenuLabel>Area</DropdownMenuLabel>
+                <DropdownMenuRadioGroup value={scope.kind} onValueChange={(v) => setArea(v === "canada" ? "canada" : "city")}>
+                  <DropdownMenuRadioItem value="city">{scope.city}</DropdownMenuRadioItem>
+                  <DropdownMenuRadioItem value="canada">All of Canada</DropdownMenuRadioItem>
+                </DropdownMenuRadioGroup>
+                {cities.length > 1 && (
+                  <DropdownMenuSub>
+                    <DropdownMenuSubTrigger>Change city</DropdownMenuSubTrigger>
+                    <DropdownMenuSubContent className="max-h-72 overflow-y-auto">
+                      <DropdownMenuRadioGroup value={scope.city} onValueChange={(c) => setArea("city", String(c))}>
+                        {cities.map((c) => <DropdownMenuRadioItem key={c} value={c}>{c}</DropdownMenuRadioItem>)}
+                      </DropdownMenuRadioGroup>
+                    </DropdownMenuSubContent>
+                  </DropdownMenuSub>
+                )}
+                <DropdownMenuSeparator />
                 <DropdownMenuLabel>Show categories</DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 {CATEGORIES.map((c) => (
@@ -389,12 +424,19 @@ export function DashboardShell({ user, role, scope, cities, mine, jobs, links, l
           </div>
 
           {selectedJob ? (
-            <JobInfo job={selectedJob} links={links.filter((l) => l.job_id === selectedJob.id)} have={have} onSkill={(slug) => select(`s:${slug}`)} />
+            <JobInfo job={selectedJob} links={links.filter((l) => l.job_id === selectedJob.id)} have={have} onSkill={(slug) => select(`s:${slug}`)} isSaved={saved.some((x) => x.id === selectedJob.id)} onSave={() => toggleSaved(selectedJob)} />
           ) : selectedSkill ? (
-            <SkillInfo skill={selectedSkill} leader={leaders.find((l) => l.slug === selectedSkill.slug)} jobs={jobs.filter((j) => links.some((l) => l.job_id === j.id && l.slug === selectedSkill.slug))} onJob={(id) => select(`j:${id}`)} />
+            <SkillInfo
+              skill={selectedSkill}
+              leader={leaders.find((l) => l.slug === selectedSkill.slug)}
+              jobs={jobs.filter((j) => links.some((l) => l.job_id === j.id && l.slug === selectedSkill.slug))}
+              onJob={(id) => select(`j:${id}`)}
+              status={have.has(selectedSkill.slug) ? "have" : learning.has(selectedSkill.slug) ? "learning" : "none"}
+              onStart={() => { setSkillStatus(selectedSkill.slug, "learning"); setCurrentSlug(selectedSkill.slug); }}
+              onFinish={() => { setCurrentSlug(selectedSkill.slug); document.getElementById("project-url")?.focus(); }}
+            />
           ) : (
             <>
-              <ScopeSwitch scope={scope} cities={cities} />
               <ToggleGroup aria-label="List" value={[tab]} onValueChange={(v) => v[0] && setTab(v[0] as "skills" | "jobs")} className="w-full">
                 <ToggleGroupItem value="skills" className="flex-1">Top skills</ToggleGroupItem>
                 <ToggleGroupItem value="jobs" className="flex-1">Closest jobs</ToggleGroupItem>
@@ -403,7 +445,11 @@ export function DashboardShell({ user, role, scope, cities, mine, jobs, links, l
                 <ol className="space-y-3">
                   {visibleLeaders.map((l, i) => (
                     <li key={l.slug}>
-                      <button className="flex w-full items-center gap-2.5 text-left text-sm" onClick={() => (data.nodes.some((n) => n.id === `s:${l.slug}`) ? select(`s:${l.slug}`) : router.push(`/skills/${l.slug}`))}>
+                      <button
+                        className="flex w-full items-center gap-2.5 rounded-lg text-left text-sm"
+                        {...rowHover(`s:${l.slug}`)}
+                        onClick={() => { setHoverId(null); if (data.nodes.some((n) => n.id === `s:${l.slug}`)) select(`s:${l.slug}`); else router.push(`/skills/${l.slug}`); }}
+                      >
                         <span className="w-4 text-right font-mono text-xs text-muted-foreground">{i + 1}</span>
                         <span className="flex-1 truncate">{l.name}</span>
                         {have.has(l.slug) && <CheckIcon className="size-3.5 text-[var(--have)]" aria-label="You have this" />}
@@ -422,7 +468,7 @@ export function DashboardShell({ user, role, scope, cities, mine, jobs, links, l
                     const m = matchOf(j.id);
                     return (
                       <li key={j.id}>
-                        <button className="flex w-full items-center justify-between gap-3 rounded-xl px-2 py-2 text-left hover:bg-secondary" onClick={() => select(`j:${j.id}`)}>
+                        <button className="flex w-full items-center justify-between gap-3 rounded-xl px-2 py-2 text-left hover:bg-secondary" {...rowHover(`j:${j.id}`)} onClick={() => { setHoverId(null); select(`j:${j.id}`); }}>
                           <span className="min-w-0">
                             <span className="block truncate text-sm">{j.title}</span>
                             <span className="block truncate text-xs text-muted-foreground">{j.company} · {j.remote ? "Remote" : j.city}</span>
@@ -454,19 +500,6 @@ function PanelList({ title, count, empty, children }: { title: string; count: nu
   );
 }
 
-// ---- The card that floats beside the selected node ----
-function FloatingCard({ children }: { children: React.ReactNode }) {
-  // The host sits on the node. .float-wrap shifts the card 64px to one side (globals.css flips it by data-side)
-  // and draws the leader line back to the node.
-  return (
-    <div className="float-wrap">
-      <span aria-hidden className="float-line" />
-      <span aria-hidden className="float-dot" />
-      <div className="surface w-80 space-y-4 p-6 text-sm text-foreground">{children}</div>
-    </div>
-  );
-}
-
 function MatchBar({ have, needed }: { have: number; needed: number }) {
   return (
     <div className="space-y-1">
@@ -476,48 +509,8 @@ function MatchBar({ have, needed }: { have: number; needed: number }) {
   );
 }
 
-function JobCard({ job, match, isSaved, onSave }: { job: GraphJob; match: { have: number; needed: number }; isSaved: boolean; onSave: () => void }) {
-  return (
-    <FloatingCard>
-      <div>
-        <p className="eyebrow">{job.company}</p>
-        <p className="mt-1 text-base font-semibold leading-snug tracking-tight">{job.title}</p>
-      </div>
-      <dl className="grid grid-cols-3 gap-2 border-y border-border py-3">
-        <div><dt className="eyebrow">Where</dt><dd className="mt-1 truncate">{job.remote ? "Remote" : job.city}</dd></div>
-        <div><dt className="eyebrow">Posted</dt><dd className="mt-1 truncate">{ago(job.posted_at).replace(" ago", "")}</dd></div>
-        <div><dt className="eyebrow">Match</dt><dd className="mt-1 font-mono">{match.have}/{match.needed}</dd></div>
-      </dl>
-      <MatchBar {...match} />
-      <div className="flex gap-2">
-        <Button size="sm" variant="secondary" onClick={onSave} className="active:scale-[0.98]">
-          {isSaved ? <BookmarkCheckIcon /> : <BookmarkIcon />}{isSaved ? "Saved" : "Save"}
-        </Button>
-        <a href={job.url} target="_blank" rel="noreferrer" className={buttonVariants({ size: "sm", variant: "ghost" })}>Job post<ArrowUpRightIcon /></a>
-      </div>
-    </FloatingCard>
-  );
-}
-
-function SkillCard({ skill, status, onStart, onFinish }: { skill: Skill; status: "have" | "learning" | "none"; onStart: () => void; onFinish: () => void }) {
-  const category = CATEGORIES.find((c) => c.slug === skill.category)?.name ?? "Skill";
-  return (
-    <FloatingCard>
-      <div>
-        <p className="flex items-center gap-2 font-semibold"><span aria-hidden className="size-2 rounded-full" style={{ background: categoryColor(skill.category) }} />{skill.name}</p>
-        <p className="text-muted-foreground">{category} · {status === "have" ? "on your resume" : status === "learning" ? "you're learning it" : "not on your resume yet"}</p>
-      </div>
-      <div className="flex flex-wrap gap-2">
-        {status === "none" && <Button size="sm" onClick={onStart} className="active:scale-[0.98]">Start learning</Button>}
-        {status === "learning" && <Button size="sm" onClick={onFinish} className="active:scale-[0.98]">Finish with a project</Button>}
-        <Link href={`/skills/${skill.slug}`} className={buttonVariants({ size: "sm", variant: "ghost" })}>Where to learn<ArrowUpRightIcon /></Link>
-      </div>
-    </FloatingCard>
-  );
-}
-
 // ---- "Overall info" in the right panel ----
-function JobInfo({ job, links, have, onSkill }: { job: GraphJob; links: GraphLink[]; have: Set<string>; onSkill: (slug: string) => void }) {
+function JobInfo({ job, links, have, onSkill, isSaved, onSave }: { job: GraphJob; links: GraphLink[]; have: Set<string>; onSkill: (slug: string) => void; isSaved: boolean; onSave: () => void }) {
   const req = links.filter((l) => l.required), bonus = links.filter((l) => !l.required);
   return (
     <div className="space-y-5">
@@ -528,18 +521,26 @@ function JobInfo({ job, links, have, onSkill }: { job: GraphJob; links: GraphLin
       <MatchBar have={req.filter((l) => have.has(l.slug)).length} needed={req.length} />
       <SkillChips title="Must-have" items={req} have={have} onSkill={onSkill} />
       <SkillChips title="Nice to have" items={bonus} have={have} onSkill={onSkill} />
-      <a href={job.url} target="_blank" rel="noreferrer" className={buttonVariants({ className: "w-full" })}>Open the job post<ArrowUpRightIcon /></a>
+      <div className="flex gap-2">
+        <a href={job.url} target="_blank" rel="noreferrer" className={buttonVariants({ className: "flex-1" })}>Open the job post<ArrowUpRightIcon /></a>
+        <Button variant="secondary" onClick={onSave} aria-pressed={isSaved} className="active:scale-[0.98]">
+          {isSaved ? <BookmarkCheckIcon /> : <BookmarkIcon />}{isSaved ? "Saved" : "Save"}
+        </Button>
+      </div>
     </div>
   );
 }
 
-function SkillInfo({ skill, leader, jobs, onJob }: { skill: Skill; leader?: Leader; jobs: GraphJob[]; onJob: (id: string) => void }) {
+function SkillInfo({ skill, leader, jobs, onJob, status, onStart, onFinish }: { skill: Skill; leader?: Leader; jobs: GraphJob[]; onJob: (id: string) => void; status: "have" | "learning" | "none"; onStart: () => void; onFinish: () => void }) {
   return (
     <div className="space-y-5">
       <div>
         <h2 className="text-lg font-semibold tracking-tight">{skill.name}</h2>
         <p className="text-sm text-muted-foreground">{CATEGORIES.find((c) => c.slug === skill.category)?.name ?? "Skill"}{leader && ` · in ${leader.jobs} job posts near you`}</p>
+        <p className="mt-1 text-sm">{status === "have" ? "On your resume" : status === "learning" ? "You're learning it" : "Not on your resume yet"}</p>
       </div>
+      {status === "none" && <Button onClick={onStart} className="w-full active:scale-[0.98]">Start learning</Button>}
+      {status === "learning" && <Button onClick={onFinish} className="w-full active:scale-[0.98]">Finish with a project</Button>}
       <section className="space-y-2">
         <h3 className="border-b border-border pb-2 text-sm font-medium">Your closest jobs that ask for it</h3>
         <ul className="space-y-1">

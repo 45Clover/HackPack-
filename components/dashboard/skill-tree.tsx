@@ -1,6 +1,6 @@
 "use client";
-// The 2D view: a skill tree. You at the root, one branch per category, skills stacked down each branch:
-// unlocked (you have it) at the top, then the one you're learning, then locked skills by how many of your jobs want them.
+// The 2D view: a skill tree that grows upward. You at the root (bottom), one branch per category, and up each branch:
+// unlocked skills first, then the one you're learning, then locked skills by how many of your jobs want them.
 import { CheckIcon, LockIcon } from "lucide-react";
 import { CATEGORIES } from "@/lib/categories";
 
@@ -33,22 +33,22 @@ export function SkillTree({ skills, have, learning, hidden, jobCount, nextSlug, 
     })
     .filter((b) => b.items.length > 0);
 
-  if (branches.length === 0) return <p className="pt-24 text-center text-sm text-muted-foreground">No skills in the categories you picked.</p>;
+  if (branches.length === 0) return <p className="pb-24 text-center text-sm text-muted-foreground">No skills in the categories you picked.</p>;
 
   return (
-    <div className="flex min-w-max flex-col items-center px-6 pb-10">
-      {/* Root */}
-      <div className="flex flex-col items-center">
+    <div className="mx-auto flex min-w-max flex-col-reverse items-center px-6 pt-6">
+      {/* Root, at the bottom */}
+      <div className="flex flex-col-reverse items-center">
         <div className="grid size-14 place-items-center rounded-full bg-[var(--blue)] text-sm font-medium text-white shadow-[0_10px_24px_-10px_var(--blue)]">You</div>
         <div className="h-6 w-px bg-foreground/25" />
       </div>
 
-      {/* Branches: each column draws its piece of the trunk, so the line runs centre-to-centre across them. */}
+      {/* Branches grow up from the trunk; each column draws its piece of it, so the line runs centre-to-centre. */}
       <div className="grid grid-flow-col auto-cols-[148px]">
         {branches.map((b, i) => (
-          <div key={b.slug} className="relative flex flex-col items-center pt-6">
-            <span aria-hidden className={`absolute top-0 h-px bg-foreground/25 ${i === 0 ? "left-1/2 right-0" : i === branches.length - 1 ? "left-0 right-1/2" : "inset-x-0"} ${branches.length === 1 ? "hidden" : ""}`} />
-            <span aria-hidden className="absolute top-0 left-1/2 h-6 w-px bg-foreground/25" />
+          <div key={b.slug} className="relative flex flex-col-reverse items-center pb-6">
+            <span aria-hidden className={`absolute bottom-0 h-px bg-foreground/25 ${i === 0 ? "left-1/2 right-0" : i === branches.length - 1 ? "left-0 right-1/2" : "inset-x-0"} ${branches.length === 1 ? "hidden" : ""}`} />
+            <span aria-hidden className="absolute bottom-0 left-1/2 h-6 w-px bg-foreground/25" />
             <p className="flex items-center gap-1.5 rounded-full bg-white px-3 py-1 text-[13px] font-medium shadow-[0_1px_2px_rgb(20_20_19/0.06)]">
               <span aria-hidden className="size-2 rounded-full" style={{ background: b.color }} />
               {b.name}
@@ -60,7 +60,7 @@ export function SkillTree({ skills, have, learning, hidden, jobCount, nextSlug, 
               const solid = state === "have" && prev === "have";
               const n = jobCount.get(s.slug) ?? 0;
               return (
-                <div key={s.slug} className="flex flex-col items-center">
+                <div key={s.slug} className="flex flex-col-reverse items-center">
                   {/* Connector: solid in the branch colour while you own the path, dashed once it's locked. */}
                   <span
                     aria-hidden
@@ -95,7 +95,7 @@ export function SkillTree({ skills, have, learning, hidden, jobCount, nextSlug, 
                 </div>
               );
             })}
-            {b.more > 0 && <p className="mt-2 text-[11px] text-muted-foreground">+{b.more} more</p>}
+            {b.more > 0 && <p className="mb-2 text-[11px] text-muted-foreground">+{b.more} more</p>}
           </div>
         ))}
       </div>
