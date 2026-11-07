@@ -33,7 +33,8 @@ type Props = {
   hidden: Set<string>; // categories filtered out
   selectedId: string | null;
   onSelect: (node: GNode | null) => void;
-  card: ReactNode; // the card shown beside the selected node
+  hoverId: string | null; // a row hovered in the sidebar: light up that node and its neighbours
+  mini: (n: GNode) => ReactNode; // small card for each neighbour of the selected node
   width: number;
   height: number;
 };
@@ -96,9 +97,11 @@ function ringTexture() {
   return new THREE.CanvasTexture(c);
 }
 
-export default function Graph3D({ data, have, learning, hidden, selectedId, onSelect, card, width, height }: Props) {
+export default function Graph3D({ data, have, learning, hidden, selectedId, onSelect, hoverId, mini, width, height }: Props) {
   const fg = useRef<ForceGraphMethods<GNode, GLink> | undefined>(undefined);
   const labels = useRef(new Map<string, CSS2DObject>());
+  const groups = useRef(new Map<string, THREE.Group>());
+  const carded = useRef(new Set<string>()); // nodes showing a card, so their label stays hidden
   const sleepTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const settling = useRef(true); // the force layout is still moving
   const reduced = useMemo(() => typeof window !== "undefined" && matchMedia("(prefers-reduced-motion: reduce)").matches, []);
@@ -124,13 +127,13 @@ export default function Graph3D({ data, have, learning, hidden, selectedId, onSe
     selectedRef.current = selectedId;
   }, [selectedId]);
 
-  // Labels: you, well-connected skills, and whatever you hover or select (plus their neighbours).
+  // Labels: well-connected skills, and whatever you hover or select (plus their neighbours).
   const paintLabels = useCallback(
     (focus: string | null) => {
       const near = focus ? neighbours.get(focus) : null;
       for (const [id, obj] of labels.current) {
         const degree = neighbours.get(id)?.size ?? 0;
-        obj.visible = id === "me" || id === focus || !!near?.has(id) || (!focus && id.startsWith("s:") && degree >= 5);
+        obj.visible = !carded.current.has(id) && (id === focus || !!near?.has(id) || (!focus && id.startsWith("s:") && degree >= 5));
       }
     },
     [neighbours],
@@ -215,52 +218,74 @@ export default function Graph3D({ data, have, learning, hidden, selectedId, onSe
     wake();
   }, [wake, hidden, have, learning, selectedId]);
 
-  // One host element per selection; the card renders into it through a portal.
-  const cardHost = useMemo(() => {
-    if (!selectedId) return null;
-    const el = document.createElement("div");
-    el.style.pointerEvents = "auto";
-    return el;
-  }, [selectedId]);
+  const near = useMemo(() => (selectedId ? neighbours.get(selectedId) ?? new Set<string>() : null), [selectedId, neighbours]);
+  const inFocus = (id: string) => !selectedId || id === selectedId || !!near?.has(id);
 
-  // Show the card beside the selected node and fly the camera to it. The card lives on the scene root and
-  // follows the node every frame, so it survives the node objects being rebuilt.
+  // Up to 6 neighbours of the selected node get their own small card (your second sketch); more would pile up.
+  const miniHosts = useMemo(() => {
+    const m = new Map<string, HTMLDivElement>();
+    if (!near) return m;
+    const ids = [...near].filter((id) => {
+      const n = data.nodes.find((x) => x.id === id);
+      return n && (n.kind !== "skill" || !hidden.has(n.category ?? ""));
+    });
+    for (const id of ids.slice(0, 6)) {
+      const el = document.createElement("div");
+      el.style.pointerEvents = "auto";
+      m.set(id, el);
+    }
+    return m;
+  }, [near, data, hidden]);
+
+  // Hover from the sidebar (or the selection): everything outside that neighbourhood fades back.
+  useEffect(() => {
+    const focus = hoverId ?? selectedId;
+    const lit = focus ? new Set([focus, ...(neighbours.get(focus) ?? [])]) : null;
+    for (const [id, group] of groups.current) {
+      group.traverse((o) => {
+        if (!(o instanceof THREE.Mesh || o instanceof THREE.Sprite)) return;
+        const mat = o.material as THREE.Material & { opacity: number };
+        mat.opacity = !lit || lit.has(id) ? (mat.userData.base ?? 1) : 0.12;
+      });
+    }
+    paintLabels(focus);
+    wake();
+  }, [hoverId, selectedId, neighbours, paintLabels, wake]);
+
+  // Selecting a node: a small card on each neighbour, and frame just that neighbourhood.
+  // The cards live on the scene root and follow their nodes every frame, so they survive node rebuilds.
   useEffect(() => {
     const graph = fg.current;
+    carded.current = new Set(miniHosts.keys());
     paintLabels(selectedId);
     if (!selectedId) {
       wake(1400);
-      graph?.zoomToFit(reduced ? 0 : 900, 140); // closing a card pulls back to the whole constellation
+      graph?.zoomToFit(reduced ? 0 : 900, 140); // closing a card pulls back to the whole map
       return;
     }
     const node = data.nodes.find((n) => n.id === selectedId);
-    if (!graph || !node || !cardHost) return;
-    const obj = new CSS2DObject(cardHost);
-    graph.scene().add(obj);
+    if (!graph || !node) return;
+    const pinned: [CSS2DObject, GNode][] = [];
+    for (const [id, host] of miniHosts) {
+      const n = data.nodes.find((x) => x.id === id);
+      if (n) pinned.push([new CSS2DObject(host), n]);
+    }
+    for (const [obj] of pinned) graph.scene().add(obj);
     let raf = 0;
     const follow = () => {
-      obj.position.set(node.x ?? 0, node.y ?? 0, node.z ?? 0);
-      // Open the card on whichever side has room, so it never slides under the right panel.
-      const { x } = graph.graph2ScreenCoords(node.x ?? 0, node.y ?? 0, node.z ?? 0);
-      cardHost.dataset.side = x > window.innerWidth * 0.55 ? "left" : "right";
+      for (const [obj, n] of pinned) obj.position.set(n.x ?? 0, n.y ?? 0, n.z ?? 0);
       raf = requestAnimationFrame(follow);
     };
     follow();
-    wake(1600); // keep drawing through the camera flight
-    const d = Math.hypot(node.x ?? 0, node.y ?? 0, node.z ?? 0);
-    const ratio = d < 1 ? 0 : 1 + 340 / d;
-    graph.cameraPosition(
-      d < 1 ? { x: 0, y: 0, z: 420 } : { x: (node.x ?? 0) * ratio, y: (node.y ?? 0) * ratio, z: (node.z ?? 0) * ratio },
-      { x: node.x ?? 0, y: node.y ?? 0, z: node.z ?? 0 },
-      reduced ? 0 : 1100,
-    );
+    wake(1800); // keep drawing through the camera move
+    graph.zoomToFit(reduced ? 0 : 1000, 160, (n: GNode) => n.id === selectedId || !!near?.has(n.id));
     return () => {
       cancelAnimationFrame(raf);
-      graph.scene().remove(obj); // CSS2DObject removes its element on "removed"
+      for (const [obj] of pinned) graph.scene().remove(obj); // CSS2DObject removes its element on "removed"
     };
-    // cardHost changes exactly when the selection does
+    // miniHosts changes exactly when the selection does
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cardHost, data, wake]);
+  }, [miniHosts, data, wake]);
 
   // Stable, so selecting a node doesn't rebuild every node; it only changes when your skills do.
   const nodeObject = useCallback(
@@ -268,31 +293,32 @@ export default function Graph3D({ data, have, learning, hidden, selectedId, onSe
       const group = new THREE.Group();
       const isHave = n.kind === "skill" && !!n.slug && have.has(n.slug);
       const isLearning = n.kind === "skill" && !!n.slug && learning.has(n.slug);
-      const color = new THREE.Color(n.kind === "me" ? BLUE : n.kind === "job" ? INK : categoryColor(n.category));
+      const color = new THREE.Color(n.kind === "job" ? INK : categoryColor(n.category));
       const degree = neighbours.get(n.id)?.size ?? 1;
-      const size = n.kind === "me" ? 9 : n.kind === "job" ? 3 : 2.6 + Math.sqrt(degree) * 0.9;
+      const size = n.kind === "job" ? 3 : 2.6 + Math.sqrt(degree) * 0.9;
 
       if (n.kind === "skill" && !isHave) {
         // A skill you don't have yet: a thin hollow ring (cobalt once you've started it).
-        const ring = new THREE.Sprite(new THREE.SpriteMaterial({ map: textures.ring, color: isLearning ? new THREE.Color(BLUE) : color, transparent: true, depthWrite: false, opacity: isLearning ? 1 : 0.8 }));
+        const ring = new THREE.Sprite(new THREE.SpriteMaterial({ map: textures.ring, color: isLearning ? new THREE.Color(BLUE) : color, transparent: true, depthWrite: false, opacity: isLearning ? 1 : 0.8, userData: { base: isLearning ? 1 : 0.8 } }));
         ring.scale.setScalar(size * 3);
         group.add(ring);
       } else if (n.kind === "job") {
-        const gem = new THREE.Mesh(new THREE.OctahedronGeometry(size), new THREE.MeshLambertMaterial({ color }));
+        const gem = new THREE.Mesh(new THREE.OctahedronGeometry(size), new THREE.MeshLambertMaterial({ color, transparent: true }));
         gem.rotation.set(0.4, 0.6, 0);
         group.add(gem);
       } else {
-        group.add(new THREE.Mesh(new THREE.SphereGeometry(size, 24, 24), new THREE.MeshLambertMaterial({ color }))); // matte, lit by the scene lights
+        group.add(new THREE.Mesh(new THREE.SphereGeometry(size, 24, 24), new THREE.MeshLambertMaterial({ color, transparent: true }))); // matte, lit by the scene lights
       }
       labels.current.get(n.id)?.element.remove(); // drop the label from the previous build so it does not linger
       const el = document.createElement("div");
       el.className = "graph-label";
-      el.textContent = n.kind === "me" ? "YOU" : n.label.length > 40 ? `${n.label.slice(0, 38)}…` : n.label;
+      el.textContent = n.label.length > 40 ? `${n.label.slice(0, 38)}…` : n.label;
       el.dataset.kind = n.kind;
       const label = new CSS2DObject(el);
       label.position.set(0, -size - 7, 0);
       group.add(label);
       labels.current.set(n.id, label);
+      groups.current.set(n.id, group);
       queueMicrotask(() => paintLabels(selectedRef.current));
       return group;
     },
@@ -317,24 +343,42 @@ export default function Graph3D({ data, have, learning, hidden, selectedId, onSe
           if (!selectedId) fg.current?.zoomToFit(900, 140);
           wake(1200); // let the zoom finish, then sleep
         }}
-        nodeVisibility={(n) => n.kind !== "skill" || !hidden.has(n.category ?? "")}
+        nodeVisibility={(n) => (n.kind !== "skill" || !hidden.has(n.category ?? "")) && inFocus(n.id)}
         linkVisibility={(l) => {
           const t = typeof l.target === "string" ? null : l.target;
-          return !t || t.kind !== "skill" || !hidden.has(t.category ?? "");
+          const ends = !selectedId || idOf(l.source) === selectedId || idOf(l.target) === selectedId;
+          return ends && (!t || t.kind !== "skill" || !hidden.has(t.category ?? ""));
         }}
-        linkColor={(l) => (l.kind === "mine" ? BLUE : l.kind === "has" ? "#9c988f" : "#cfcbc2")}
+        linkColor={(l) => {
+          const focus = hoverId;
+          if (focus && idOf(l.source) !== focus && idOf(l.target) !== focus) return "#e6e3dc"; // faded while you hover a row
+          return l.kind === "has" ? "#9c988f" : "#cfcbc2";
+        }}
         linkOpacity={0.6}
         linkWidth={0}
         linkCurvature={0.22}
         onNodeHover={(n) => {
           document.body.style.cursor = n ? "pointer" : "";
-          paintLabels(n?.id ?? selectedId);
+          paintLabels(n?.id ?? hoverId ?? selectedId);
         }}
-        onNodeClick={(n) => onSelect(n.kind === "me" ? null : n)}
+        onNodeClick={(n) => onSelect(n)}
         onBackgroundClick={() => onSelect(null)}
         nodeThreeObject={nodeObject}
       />
-      {cardHost && createPortal(card, cardHost)}
+      {[...miniHosts].map(([id, host]) => {
+        const n = data.nodes.find((x) => x.id === id);
+        return n
+          ? createPortal(
+              <div className="mini-wrap">
+                <button className="surface block max-w-[200px] rounded-2xl px-3 py-2 text-left text-xs text-foreground hover:ring-1 hover:ring-foreground/20" onClick={() => onSelect(n)}>
+                  {mini(n)}
+                </button>
+              </div>,
+              host,
+              id,
+            )
+          : null;
+      })}
     </>
   );
 }

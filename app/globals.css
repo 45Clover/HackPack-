@@ -174,14 +174,6 @@
   .rise-in { animation: none; }
 }
 
-/* The card beside a selected 3D node, with a thin line back to it. Flips side by data-side. */
-.float-wrap { position: relative; transform: translate(calc(50% + 56px), 0); }
-.float-line { position: absolute; top: 50%; right: 100%; width: 56px; height: 1px; background: #2a2a28; }
-.float-dot { position: absolute; top: 50%; right: calc(100% + 56px); width: 7px; height: 7px; border-radius: 999px; background: #2a2a28; transform: translate(50%, -50%); }
-[data-side="left"] > .float-wrap { transform: translate(calc(-50% - 56px), 0); }
-[data-side="left"] > .float-wrap > .float-line { right: auto; left: 100%; }
-[data-side="left"] > .float-wrap > .float-dot { right: auto; left: calc(100% + 56px); transform: translate(-50%, -50%); }
-
 /* Depth behind the graph: a soft studio light (bright centre, warmer edges) plus a faint paper grain. */
 .scene-bg {
   background: radial-gradient(120% 95% at 50% 40%, #fcfbf8 0%, #f4f3ef 48%, #e6e3db 100%);
@@ -195,3 +187,6 @@
   mix-blend-mode: multiply;
   background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.3  0 0 0 0 0.28  0 0 0 0 0.25  0 0 0 0.9 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
 }
+
+/* Small cards on the neighbours of the selected node: they sit just above their node. */
+.mini-wrap { transform: translate(0, calc(-50% - 22px)); }
