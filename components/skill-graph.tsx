@@ -39,7 +39,7 @@ export function SkillGraph({ edges }: { edges: Edge[] }) {
           ctx.fillStyle = node.kind === "skill" ? "#2563eb" : "#d97706";
           ctx.fill();
           ctx.font = `${12 / scale}px sans-serif`;
-          ctx.fillStyle = "#111827";
+          ctx.fillStyle = "rgba(255,255,255,0.85)";
           ctx.fillText(node.label, (node.x ?? 0) + r + 2, (node.y ?? 0) + 4);
         }}
       />
