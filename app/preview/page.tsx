@@ -58,7 +58,7 @@ export default async function Preview({ searchParams }: PageProps<"/preview">) {
 
   return (
     <>
-      <p className="glass fixed bottom-[88px] left-1/2 z-20 hidden -translate-x-1/2 rounded-full px-4 py-1.5 text-xs text-muted-foreground lg:block">
+      <p className="surface fixed bottom-[88px] left-1/2 z-20 hidden -translate-x-1/2 rounded-full px-4 py-1.5 text-xs text-muted-foreground lg:block">
         <strong className="text-foreground">Dev preview</strong> · {scored.length} live job posts from {Object.values(BOARDS).join(", ")} · keyword skills · sample resume ·{" "}
         <Link href="/preview/onboarding" className="underline underline-offset-4">See onboarding</Link>
       </p>
