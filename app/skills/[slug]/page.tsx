@@ -25,9 +25,9 @@ export default async function SkillPage({ params, searchParams }: PageProps<"/sk
       select c.name, count(*)::int as jobs
       from job_skills js join jobs j on j.id = js.job_id join companies c on c.id = j.company_id
       where js.skill_id = ${skill.id} and ${area} group by c.name order by jobs desc`,
-    // Tiger Data: weekly demand, bucketed by the date each company posted the job.
+    // Weekly demand, grouped by the date each company posted the job.
     sql<{ week: Date; jobs: number }[]>`
-      select time_bucket('1 week', js.posted_at) as week, count(*)::int as jobs
+      select date_trunc('week', js.posted_at) as week, count(*)::int as jobs
       from job_skills js join jobs j on j.id = js.job_id
       where js.skill_id = ${skill.id} and ${area} and js.posted_at > now() - interval '120 days'
       group by week order by week`,
