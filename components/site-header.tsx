@@ -1,12 +1,12 @@
 import Link from "next/link";
-import { auth0 } from "@/lib/auth0";
+import { auth0, authReady } from "@/lib/auth0";
 import { getNotifications, getProfile } from "@/lib/dashboard";
 import { buttonVariants } from "@/components/ui/button";
 import { NavMenu, NotificationsMenu, UserMenu } from "@/components/header-menus";
 
 // Top bar: [menu] HackPack ............ [notifications] [profile]
 export async function SiteHeader() {
-  const session = await auth0.getSession();
+  const session = authReady ? await auth0.getSession() : null;
   const notifications = session
     ? await getNotifications(session.user.sub, (await getProfile(session.user.sub))?.city ?? null)
     : [];

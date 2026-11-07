@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { auth0 } from "@/lib/auth0";
+import { auth0, authReady } from "@/lib/auth0";
 import { getDashboard, getProfile } from "@/lib/dashboard";
 import { resolveScope } from "@/lib/scope";
 import { roleBySlug } from "@/lib/roles";
@@ -12,7 +12,7 @@ import { Leaderboard } from "@/components/dashboard/leaderboard";
 // Signed out → the public map. Signed in without a profile → onboarding. Otherwise → your dashboard.
 export default async function Home({ searchParams }: PageProps<"/">) {
   const sp = await searchParams;
-  const session = await auth0.getSession();
+  const session = authReady ? await auth0.getSession() : null;
   if (!session) return <PublicMap searchParams={sp} />;
 
   const profile = await getProfile(session.user.sub);
