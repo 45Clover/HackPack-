@@ -42,6 +42,48 @@ const BLUE = "#2f5bea";
 const INK = "#1f1f1d";
 const idOf = (end: string | GNode) => (typeof end === "string" ? end : end.id);
 
+// A soft cumulus cloud: overlapping white puffs, a little shade underneath.
+function cloudTexture() {
+  const c = document.createElement("canvas");
+  c.width = 512;
+  c.height = 256;
+  const g = c.getContext("2d")!;
+  const puff = (x: number, y: number, r: number) => {
+    const grad = g.createRadialGradient(x, y, 0, x, y, r);
+    grad.addColorStop(0, "rgba(255,255,255,0.95)");
+    grad.addColorStop(0.55, "rgba(255,255,255,0.6)");
+    grad.addColorStop(1, "rgba(255,255,255,0)");
+    g.fillStyle = grad;
+    g.beginPath();
+    g.arc(x, y, r, 0, Math.PI * 2);
+    g.fill();
+  };
+  for (const [x, y, r] of [[140, 150, 80], [210, 120, 95], [290, 110, 105], [360, 135, 85], [250, 160, 90], [190, 165, 70], [330, 165, 75], [420, 160, 55], [90, 170, 50]]) puff(x, y, r);
+  const shade = g.createLinearGradient(0, 120, 0, 230);
+  shade.addColorStop(0, "rgba(160,165,178,0)");
+  shade.addColorStop(1, "rgba(160,165,178,0.22)");
+  g.globalCompositeOperation = "source-atop";
+  g.fillStyle = shade;
+  g.fillRect(0, 0, 512, 256);
+  return new THREE.CanvasTexture(c);
+}
+
+// A smooth pebble: an icosphere nudged by low-frequency waves, so each one is lumpy in its own way.
+function pebble(radius: number, seed: number) {
+  const geo = new THREE.IcosahedronGeometry(radius, 4);
+  const pos = geo.attributes.position;
+  const v = new THREE.Vector3();
+  for (let i = 0; i < pos.count; i++) {
+    v.fromBufferAttribute(pos, i).normalize();
+    const bump = 1 + 0.1 * Math.sin(v.x * 3 + seed) * Math.cos(v.y * 2.3 + seed * 1.7) + 0.06 * Math.sin(v.z * 4.1 + seed * 0.6);
+    v.multiplyScalar(radius * bump);
+    v.y *= 0.72; // a little flatter, like a river stone
+    pos.setXYZ(i, v.x, v.y, v.z);
+  }
+  geo.computeVertexNormals();
+  return geo;
+}
+
 function ringTexture() {
   const c = document.createElement("canvas");
   c.width = c.height = 128;
@@ -111,6 +153,40 @@ export default function Graph3D({ data, have, learning, hidden, selectedId, onSe
     // Depth haze: nodes further from the camera fade toward the paper colour, so near and far read as you orbit.
     graph.scene().fog = new THREE.FogExp2(0xf4f3ef, 0.00045);
 
+    // Backdrop (reference 3): a sea of clouds below and matte stones and spheres far out. They sit outside the
+    // camera's reach, so they always stay background, and they slide past each other as you orbit: real parallax.
+    const backdrop = new THREE.Group();
+    const cloudTex = cloudTexture();
+    const clouds: [number, number, number, number][] = [
+      [-1500, -620, -900, 1100], [-300, -700, -1700, 1300], [1300, -640, -1100, 1150], [1900, -560, 300, 900],
+      [-1900, -580, 500, 950], [400, -760, 1500, 1200], [-900, -680, 1700, 1000], [800, -300, -2300, 1000],
+      [-1500, 200, -2000, 850], [2100, 120, -1300, 800],
+    ];
+    for (const [x, y, z, w] of clouds) {
+      const cloud = new THREE.Sprite(new THREE.SpriteMaterial({ map: cloudTex, transparent: true, depthWrite: false, fog: false, opacity: 0.9 }));
+      cloud.position.set(x, y, z);
+      cloud.scale.set(w, w / 2, 1);
+      backdrop.add(cloud);
+    }
+    const objects: { geo: THREE.BufferGeometry; color: string; at: [number, number, number] }[] = [
+      { geo: new THREE.SphereGeometry(230, 48, 48), color: "#2f5bea", at: [-1250, -380, -1700] },
+      { geo: new THREE.SphereGeometry(260, 48, 48), color: "#9aa6b8", at: [1500, -520, -1500] },
+      { geo: new THREE.SphereGeometry(150, 48, 48), color: "#ffffff", at: [900, 520, -1800] },
+      { geo: pebble(140, 1), color: "#d8cfbf", at: [-1700, -260, -300] },
+      { geo: pebble(110, 2), color: "#e6dfd2", at: [1750, -200, 700] },
+      { geo: pebble(170, 3), color: "#cfc6b5", at: [-300, -620, 1750] },
+      { geo: pebble(90, 4), color: "#bfc7d3", at: [500, 650, 1600] },
+    ];
+    for (const o of objects) {
+      const mesh = new THREE.Mesh(o.geo, new THREE.MeshLambertMaterial({ color: o.color, fog: false }));
+      mesh.position.set(...o.at);
+      backdrop.add(mesh);
+    }
+    graph.scene().add(backdrop);
+    const controls = graph.controls() as { maxDistance?: number; minDistance?: number };
+    controls.maxDistance = 1250; // stay inside the backdrop so it never blocks the map
+    controls.minDistance = 90;
+
     graph.d3Force("charge")?.strength(-340);
     graph.d3Force("link")?.distance((l: GLink) => (l.kind === "mine" ? 80 : 125));
 
@@ -123,6 +199,14 @@ export default function Graph3D({ data, have, learning, hidden, selectedId, onSe
       for (const type of ["pointerdown", "pointermove", "wheel", "touchstart"]) canvas.removeEventListener(type, onInput);
       clearTimeout(sleepTimer.current);
       graph.scene().fog = null;
+      graph.scene().remove(backdrop);
+      backdrop.traverse((o) => {
+        if (o instanceof THREE.Mesh || o instanceof THREE.Sprite) {
+          o.geometry.dispose();
+          (o.material as THREE.Material).dispose();
+        }
+      });
+      cloudTex.dispose();
     };
   }, [wake]);
 
