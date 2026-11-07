@@ -3,7 +3,6 @@ import { auth0, authReady } from "@/lib/auth0";
 import { getNotifications, getProfile } from "@/lib/dashboard";
 import { buttonVariants } from "@/components/ui/button";
 import { NavMenu, NotificationsMenu, UserMenu } from "@/components/header-menus";
-import { LiquidTopBar } from "@/components/liquid";
 
 // Top bar: [menu] HackPack ............ [notifications] [profile]
 export async function SiteHeader() {
@@ -13,8 +12,8 @@ export async function SiteHeader() {
     : [];
 
   return (
-    <LiquidTopBar>
-      <nav className="flex h-[62px] w-[calc(100vw-16px)] items-center gap-2 px-3 pt-[10px] text-sm text-foreground lg:w-[78vw]">
+    <header className="fixed inset-x-2 top-0 z-30 lg:inset-x-[11vw]">
+      <nav className="surface flex h-[52px] items-center gap-2 rounded-t-none rounded-b-[22px] px-3">
         <NavMenu signedIn={!!session} />
         <Link href="/" className="text-[15px] font-semibold tracking-tight">HackPack</Link>
         <div className="ml-auto flex items-center gap-1">
@@ -29,6 +28,6 @@ export async function SiteHeader() {
           )}
         </div>
       </nav>
-    </LiquidTopBar>
+    </header>
   );
 }

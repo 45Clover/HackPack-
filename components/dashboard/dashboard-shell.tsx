@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import {
-  ArrowLeftIcon, ArrowUpRightIcon, BookmarkIcon, BookmarkCheckIcon, CheckIcon, SlidersHorizontalIcon, SparklesIcon, XIcon,
+  ArrowLeftIcon, ArrowUpRightIcon, BookmarkIcon, BookmarkCheckIcon, CheckIcon, SlidersHorizontalIcon, XIcon,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -22,7 +22,6 @@ import type { GraphJob, GraphLink, Leader, MySkill, SavedJob } from "@/lib/dashb
 import type { Scope } from "@/lib/scope";
 import type { GLink, GNode } from "./graph-3d";
 import { GraphBoundary } from "./graph-boundary";
-import { LiquidDock } from "@/components/liquid";
 
 const Graph3D = dynamic(() => import("./graph-3d"), {
   ssr: false,
@@ -159,45 +158,33 @@ export function DashboardShell({ user, role, scope, cities, mine, jobs, links, l
 
       {/* Mobile: the panels stack over the graph. Desktop: they slide out from the screen edges (Saagii's mockup). */}
       <div className="pointer-events-none relative z-10 flex flex-col gap-4 lg:contents">
-        {/* LEFT: you, next skill, saved, started */}
+        {/* LEFT: one white card (you, saved, started) and one solid black card (next skill). No cards inside cards. */}
         <div className="flex flex-col gap-4 lg:fixed lg:top-[122px] lg:bottom-0 lg:left-0 lg:w-[clamp(250px,18.6vw,330px)] lg:gap-[30px]">
-        <section className="glass glass-in pointer-events-auto flex shrink-0 flex-col gap-5 p-5 lg:rounded-l-none lg:rounded-r-[40px] lg:border-l-0 lg:pl-6">
-          <div className="flex flex-col items-center gap-2 pt-1 text-center">
-            <Avatar className="size-16 ring-2 ring-white/15 ring-offset-2 ring-offset-transparent">
+        <section className="surface rise-in pointer-events-auto flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto p-6 lg:rounded-l-none lg:rounded-r-[40px]">
+          <div className="flex items-center gap-3">
+            <Avatar className="size-12">
               {user.picture && <AvatarImage src={user.picture} alt="" />}
-              <AvatarFallback className="bg-white/10 text-lg">{initials}</AvatarFallback>
+              <AvatarFallback className="bg-secondary text-sm font-medium">{initials}</AvatarFallback>
             </Avatar>
-            <div>
-              <p className="text-lg font-semibold tracking-tight">{user.name}</p>
+            <div className="min-w-0">
+              <p className="text-xl leading-tight font-medium tracking-tight break-words">{user.name}</p>
               <p className="text-sm text-muted-foreground">{role} · {scope.kind === "canada" ? "Canada" : scope.city}</p>
             </div>
-            <Link href="/onboarding" className="text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline">Edit skills &amp; resume</Link>
           </div>
 
-          <dl className="grid grid-cols-3 gap-2">
+          <dl className="flex justify-between border-y border-border py-4">
             {([["Skills", have.size], ["Saved", saved.length], ["Started", learning.size]] as const).map(([label, n]) => (
-              <div key={label} className="rounded-2xl border border-white/10 bg-white/[0.05] px-2 py-3 text-center shadow-[inset_0_1px_0_rgb(255_255_255/0.08)]">
-                <dd className="text-2xl font-semibold tabular-nums">{n}</dd>
-                <dt className="eyebrow mt-0.5">{label}</dt>
+              <div key={label}>
+                <dd className="text-[28px] leading-none font-medium tracking-tight tabular-nums">{n}</dd>
+                <dt className="eyebrow mt-1.5">{label}</dt>
               </div>
             ))}
           </dl>
 
-          {nextSkill && (
-            <div className="space-y-2 rounded-2xl border border-[var(--star)]/25 bg-[var(--star)]/[0.06] p-4">
-              <p className="eyebrow flex items-center gap-1.5 !text-[var(--star)]"><SparklesIcon className="size-3.5" />Next skill</p>
-              <p className="text-xl font-semibold tracking-tight">{nextSkill.skill.name}</p>
-              <p className="text-sm text-muted-foreground">Asked for in {nextSkill.jobs} of your closest jobs</p>
-              <Button size="sm" className="active:scale-[0.98]" onClick={() => select(`s:${nextSkill.skill.slug}`)}>Show me where</Button>
-            </div>
-          )}
-
-        </section>
-        <section className="glass glass-in pointer-events-auto flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto p-5 lg:rounded-none lg:rounded-tr-[40px] lg:border-b-0 lg:border-l-0 lg:pl-6">
           <PanelList title="Saved" count={saved.length} empty="Save jobs from the graph to keep them here.">
             {saved.map((s) => (
-              <li key={s.id} className="group flex items-start gap-2.5">
-                <button aria-label={`Unsave ${s.title}`} className="mt-0.5 text-[var(--star)] hover:opacity-70" onClick={() => {
+              <li key={s.id} className="flex items-start gap-2.5">
+                <button aria-label={`Unsave ${s.title}`} className="mt-0.5 text-[var(--blue)] hover:opacity-70" onClick={() => {
                   const job = jobs.find((j) => j.id === s.id);
                   if (job) toggleSaved(job);
                   else setSaved(saved.filter((x) => x.id !== s.id));
@@ -210,36 +197,50 @@ export function DashboardShell({ user, role, scope, cities, mine, jobs, links, l
             ))}
           </PanelList>
 
-          <PanelList title="Started" count={learning.size} empty="Start a skill from its card, and tick it off once you've learned it.">
+          <PanelList title="Started" count={learning.size} empty="Start a skill from its card, then tick it off once you've learned it.">
             {[...learning].map((slug) => skills.get(slug)).filter((s): s is Skill => !!s).map((s) => (
               <li key={s.slug} className="flex items-center gap-2.5">
                 <button
                   aria-label={`Mark ${s.name} as learned`}
-                  className="grid size-4 place-items-center rounded-[5px] border border-white/30 hover:border-[var(--have)] hover:bg-[var(--have)]/20"
+                  className="size-4 shrink-0 rounded-[5px] border-[1.5px] border-foreground/30 hover:border-[var(--have)] hover:bg-[var(--have)]/15"
                   onClick={() => setSkillStatus(s.slug, "have")}
                 />
                 <button className="flex min-w-0 flex-1 items-center gap-2 text-left text-sm" onClick={() => select(`s:${s.slug}`)}>
-                  <span aria-hidden className="size-1.5 shrink-0 rounded-full" style={{ background: categoryColor(s.category) }} />
+                  <span aria-hidden className="size-2 shrink-0 rounded-full" style={{ background: categoryColor(s.category) }} />
                   <span className="truncate">{s.name}</span>
                 </button>
                 <button aria-label={`Stop learning ${s.name}`} className="text-muted-foreground hover:text-foreground" onClick={() => setSkillStatus(s.slug, "none")}><XIcon className="size-3.5" /></button>
               </li>
             ))}
           </PanelList>
+
+          <Link href="/onboarding" className="mt-auto text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline">Edit skills &amp; resume</Link>
           {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
         </section>
+
+        {nextSkill && (
+          <section className="surface-ink rise-in pointer-events-auto shrink-0 space-y-3 p-6 lg:rounded-none lg:rounded-tr-[40px]">
+            <p className="text-sm text-white/60">Next skill</p>
+            <p className="text-[40px] leading-[1.05] font-medium tracking-tight">{nextSkill.skill.name}</p>
+            <p className="text-sm text-white/60">Asked for in {nextSkill.jobs} of your closest jobs</p>
+            <button
+              className="rounded-full bg-white px-4 py-2 text-sm font-medium text-[var(--ink)] transition-transform active:scale-[0.98]"
+              onClick={() => select(`s:${nextSkill.skill.slug}`)}
+            >
+              Show me where
+            </button>
+          </section>
+        )}
         </div>
 
         <div className="contents">
-          <div className="pointer-events-none hidden text-center lg:fixed lg:inset-x-0 lg:top-[70px] lg:block">
-            <h1 className="text-sm font-medium tracking-[0.3em] uppercase">Your skill constellation</h1>
-            <p className="mt-2 text-sm text-muted-foreground">
+          <div className="pointer-events-none hidden text-center lg:fixed lg:inset-x-0 lg:top-[68px] lg:block">
+            <h1 className="text-2xl font-medium tracking-tight">Your skill map</h1>
+            <p className="mt-1 text-sm text-muted-foreground">
               {scope.kind === "canada" ? "Canada" : scope.city} · {jobs.length} closest jobs · {have.size} skills
             </p>
           </div>
-          <div className="hidden lg:block">
-          <LiquidDock>
-          <nav aria-label="Focus one category" className="pointer-events-auto flex max-w-[56vw] items-center gap-0.5 overflow-x-auto">
+          <nav aria-label="Focus one category" className="surface pointer-events-auto hidden max-w-[calc(100vw-clamp(250px,18.6vw,330px)-clamp(270px,19.8vw,350px)-48px)] items-center gap-0.5 overflow-x-auto rounded-full p-1.5 [scrollbar-width:none] lg:fixed lg:bottom-5 lg:left-1/2 lg:flex lg:-translate-x-1/2">
             {[{ slug: "all", name: "All" }, ...CATEGORIES.filter((c) => [...skills.values()].some((sk) => sk.category === c.slug))].map((c) => {
               const active = c.slug === "all" ? hidden.size === 0 : hidden.size === CATEGORIES.length - 1 && !hidden.has(c.slug);
               return (
@@ -247,26 +248,25 @@ export function DashboardShell({ user, role, scope, cities, mine, jobs, links, l
                   key={c.slug}
                   aria-pressed={active}
                   onClick={() => setHidden(c.slug === "all" ? new Set() : new Set(CATEGORIES.filter((x) => x.slug !== c.slug).map((x) => x.slug)))}
-                  className={`shrink-0 rounded-full px-2.5 py-1.5 text-[10.5px] tracking-[0.12em] uppercase transition-colors ${active ? "bg-white/[0.14] text-foreground shadow-[inset_0_1px_0_rgb(255_255_255/0.12)]" : "text-muted-foreground hover:text-foreground"}`}
+                  className={`flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1.5 text-[12.5px] transition-colors ${active ? "bg-[var(--ink)] text-white" : "text-muted-foreground hover:bg-secondary hover:text-foreground"}`}
                 >
+                  {c.slug !== "all" && <span aria-hidden className="size-2 rounded-full" style={{ background: "color" in c ? c.color : undefined }} />}
                   {c.name}
                 </button>
               );
             })}
           </nav>
-          </LiquidDock>
-          </div>
         </div>
 
         {/* RIGHT: leaderboard / closest jobs, or "overall info" for the selected node */}
-        <aside className="glass glass-in pointer-events-auto flex flex-col gap-4 overflow-y-auto p-5 lg:fixed lg:top-[122px] lg:right-0 lg:bottom-0 lg:w-[clamp(270px,19.8vw,350px)] lg:rounded-none lg:rounded-tl-[40px] lg:border-r-0 lg:border-b-0 lg:pr-6">
+        <aside className="surface rise-in pointer-events-auto flex flex-col gap-5 overflow-y-auto p-6 lg:fixed lg:top-[122px] lg:right-0 lg:bottom-0 lg:w-[clamp(270px,19.8vw,350px)] lg:rounded-none lg:rounded-tl-[40px]">
           <div className="flex items-center justify-between gap-2">
             {selected ? (
               <button className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground" onClick={() => setSelected(null)}>
                 <ArrowLeftIcon className="size-4" />Overall info
               </button>
             ) : (
-              <h2 className="font-semibold tracking-tight">Leaderboard</h2>
+              <h2 className="text-xl font-medium tracking-tight">Leaderboard</h2>
             )}
             <DropdownMenu>
               <DropdownMenuTrigger className={buttonVariants({ variant: "ghost", size: "icon" })} aria-label="Filter categories">
@@ -310,7 +310,7 @@ export function DashboardShell({ user, role, scope, cities, mine, jobs, links, l
                         {have.has(l.slug) && <CheckIcon className="size-3.5 text-[var(--have)]" aria-label="You have this" />}
                         <span className="font-mono text-xs text-muted-foreground">{l.jobs}</span>
                       </button>
-                      <div className="mt-1.5 ml-6.5 h-[3px] rounded-full bg-white/[0.06]" aria-hidden>
+                      <div className="mt-1.5 ml-6.5 h-[3px] rounded-full bg-secondary" aria-hidden>
                         <div className="h-full rounded-full" style={{ width: `${(l.jobs / (visibleLeaders[0]?.jobs || 1)) * 100}%`, background: categoryColor(l.category) }} />
                       </div>
                     </li>
@@ -323,7 +323,7 @@ export function DashboardShell({ user, role, scope, cities, mine, jobs, links, l
                     const m = matchOf(j.id);
                     return (
                       <li key={j.id}>
-                        <button className="flex w-full items-center justify-between gap-3 rounded-xl px-2 py-2 text-left hover:bg-white/[0.05]" onClick={() => select(`j:${j.id}`)}>
+                        <button className="flex w-full items-center justify-between gap-3 rounded-xl px-2 py-2 text-left hover:bg-secondary" onClick={() => select(`j:${j.id}`)}>
                           <span className="min-w-0">
                             <span className="block truncate text-sm">{j.title}</span>
                             <span className="block truncate text-xs text-muted-foreground">{j.company} · {j.remote ? "Remote" : j.city}</span>
@@ -347,15 +347,15 @@ export function DashboardShell({ user, role, scope, cities, mine, jobs, links, l
 function PanelList({ title, count, empty, children }: { title: string; count: number; empty: string; children: React.ReactNode }) {
   return (
     <section className="space-y-3">
-      <h2 className="eyebrow flex items-baseline justify-between border-b border-white/10 pb-2">
-        {title}<span className="font-mono">{count}</span>
+      <h2 className="flex items-baseline justify-between text-sm font-medium">
+        {title}<span className="text-muted-foreground tabular-nums">{count}</span>
       </h2>
       {count === 0 ? <p className="text-sm text-muted-foreground">{empty}</p> : <ul className="space-y-2.5">{children}</ul>}
     </section>
   );
 }
 
-// ---- The glass card that floats beside the selected node ----
+// ---- The card that floats beside the selected node ----
 function FloatingCard({ children }: { children: React.ReactNode }) {
   // The host sits on the node. .float-wrap shifts the card 64px to one side (globals.css flips it by data-side)
   // and draws the leader line back to the node.
@@ -363,7 +363,7 @@ function FloatingCard({ children }: { children: React.ReactNode }) {
     <div className="float-wrap">
       <span aria-hidden className="float-line" />
       <span aria-hidden className="float-dot" />
-      <div className="glass glass-in w-80 space-y-4 p-5 text-sm text-foreground">{children}</div>
+      <div className="surface w-80 space-y-4 p-6 text-sm text-foreground">{children}</div>
     </div>
   );
 }
@@ -372,7 +372,7 @@ function MatchBar({ have, needed }: { have: number; needed: number }) {
   return (
     <div className="space-y-1">
       <div className="flex justify-between text-xs text-muted-foreground"><span>Must-have skills you have</span><span className="font-mono">{have}/{needed}</span></div>
-      <div className="h-1.5 rounded-full bg-white/10"><div className="h-full rounded-full bg-[var(--have)]" style={{ width: `${needed ? (have / needed) * 100 : 0}%` }} /></div>
+      <div className="h-1.5 rounded-full bg-secondary"><div className="h-full rounded-full bg-[var(--blue)]" style={{ width: `${needed ? (have / needed) * 100 : 0}%` }} /></div>
     </div>
   );
 }
@@ -384,7 +384,7 @@ function JobCard({ job, match, isSaved, onSave }: { job: GraphJob; match: { have
         <p className="eyebrow">{job.company}</p>
         <p className="mt-1 text-base font-semibold leading-snug tracking-tight">{job.title}</p>
       </div>
-      <dl className="grid grid-cols-3 gap-2 border-y border-white/10 py-3">
+      <dl className="grid grid-cols-3 gap-2 border-y border-border py-3">
         <div><dt className="eyebrow">Where</dt><dd className="mt-1 truncate">{job.remote ? "Remote" : job.city}</dd></div>
         <div><dt className="eyebrow">Posted</dt><dd className="mt-1 truncate">{ago(job.posted_at).replace(" ago", "")}</dd></div>
         <div><dt className="eyebrow">Match</dt><dd className="mt-1 font-mono">{match.have}/{match.needed}</dd></div>
@@ -442,11 +442,11 @@ function SkillInfo({ skill, leader, jobs, onJob }: { skill: Skill; leader?: Lead
         <p className="text-sm text-muted-foreground">{CATEGORIES.find((c) => c.slug === skill.category)?.name ?? "Skill"}{leader && ` · in ${leader.jobs} job posts near you`}</p>
       </div>
       <section className="space-y-2">
-        <h3 className="border-b border-white/10 pb-2 text-sm font-medium">Your closest jobs that ask for it</h3>
+        <h3 className="border-b border-border pb-2 text-sm font-medium">Your closest jobs that ask for it</h3>
         <ul className="space-y-1">
           {jobs.map((j) => (
             <li key={j.id}>
-              <button className="w-full rounded-xl px-2 py-1.5 text-left hover:bg-white/[0.05]" onClick={() => onJob(j.id)}>
+              <button className="w-full rounded-xl px-2 py-1.5 text-left hover:bg-secondary" onClick={() => onJob(j.id)}>
                 <span className="block truncate text-sm">{j.title}</span>
                 <span className="block text-xs text-muted-foreground">{j.company}</span>
               </button>
@@ -468,7 +468,7 @@ function SkillChips({ title, items, have, onSkill }: { title: string; items: Gra
       <div className="flex flex-wrap gap-1.5">
         {items.map((l) => (
           <button key={l.slug} onClick={() => onSkill(l.slug)}>
-            <Badge variant="outline" className={`gap-1.5 ${have.has(l.slug) ? "border-[var(--have)]/40" : "opacity-80"}`}>
+            <Badge variant="secondary" className={`gap-1.5 ${have.has(l.slug) ? "" : "text-muted-foreground"}`}>
               {have.has(l.slug) ? <CheckIcon className="size-3 text-[var(--have)]" /> : <span aria-hidden className="size-1.5 rounded-full" style={{ background: categoryColor(l.category) }} />}
               {l.name}
             </Badge>

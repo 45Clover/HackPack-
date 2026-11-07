@@ -55,7 +55,7 @@ export function OnboardingFlow({ firstName, skills, cities, initial }: Props) {
   }
 
   return (
-    <Card className="glass glass-in mt-6 border-0 bg-transparent">
+    <Card className="surface rise-in mt-6 border-0 ring-0">
       <CardHeader>
         <p className="text-sm text-muted-foreground">Step {step} of 3</p>
         <CardTitle className="text-2xl">
@@ -72,7 +72,7 @@ export function OnboardingFlow({ firstName, skills, cities, initial }: Props) {
 
       <CardContent className="space-y-4">
         {step === 1 && (
-          <label className="flex cursor-pointer flex-col items-center gap-2 rounded-xl border border-dashed p-10 text-center hover:bg-muted/50">
+          <label className="flex cursor-pointer flex-col items-center gap-2 rounded-2xl bg-secondary p-10 text-center transition-colors hover:bg-[#e4e2dc]">
             <FileUpIcon className="size-8 text-muted-foreground" />
             <span className="font-medium">Upload your resume (PDF, up to 5 MB)</span>
             <input
