@@ -108,6 +108,9 @@ export default function Graph3D({ data, have, learning, hidden, selectedId, onSe
   useEffect(() => {
     const graph = fg.current;
     if (!graph) return;
+    // Depth haze: nodes further from the camera fade toward the paper colour, so near and far read as you orbit.
+    graph.scene().fog = new THREE.FogExp2(0xf4f3ef, 0.00045);
+
     graph.d3Force("charge")?.strength(-340);
     graph.d3Force("link")?.distance((l: GLink) => (l.kind === "mine" ? 80 : 125));
 
@@ -119,6 +122,7 @@ export default function Graph3D({ data, have, learning, hidden, selectedId, onSe
     return () => {
       for (const type of ["pointerdown", "pointermove", "wheel", "touchstart"]) canvas.removeEventListener(type, onInput);
       clearTimeout(sleepTimer.current);
+      graph.scene().fog = null;
     };
   }, [wake]);
 
@@ -218,7 +222,7 @@ export default function Graph3D({ data, have, learning, hidden, selectedId, onSe
         graphData={data}
         width={width}
         height={height}
-        backgroundColor="#f4f3ef"
+        backgroundColor="rgba(0,0,0,0)" // transparent: the lit backdrop lives in CSS (.scene-bg)
         showNavInfo={false}
         controlType="orbit"
         extraRenderers={[css2d] as never} // CSS2DRenderer works here; three types and 3d-force-graph types disagree

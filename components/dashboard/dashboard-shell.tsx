@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import {
-  ArrowLeftIcon, ArrowUpRightIcon, BookmarkIcon, BookmarkCheckIcon, CheckIcon, SlidersHorizontalIcon, XIcon,
+  ArrowLeftIcon, ArrowUpRightIcon, BookmarkIcon, BookmarkCheckIcon, CheckIcon, PanelLeftCloseIcon, PanelLeftOpenIcon, SlidersHorizontalIcon, XIcon,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -47,9 +47,10 @@ type Props = {
   started: MySkill[];
   persist: boolean; // false on /preview: changes stay in the browser
   initialFocus?: string; // e.g. "s:react" or "j:<job id>": open with that node selected
+  initialSidebarOpen?: boolean;
 };
 
-export function DashboardShell({ user, role, scope, cities, mine, jobs, links, leaders, saved: initialSaved, started, persist, initialFocus }: Props) {
+export function DashboardShell({ user, role, scope, cities, mine, jobs, links, leaders, saved: initialSaved, started, persist, initialFocus, initialSidebarOpen = true }: Props) {
   const router = useRouter();
   const skills = useMemo(() => {
     const m = new Map<string, Skill>();
@@ -64,6 +65,7 @@ export function DashboardShell({ user, role, scope, cities, mine, jobs, links, l
   const [selected, setSelected] = useState<GNode | null>(null);
   const [focusId] = useState(initialFocus ?? null);
   const [tab, setTab] = useState<"skills" | "jobs">("skills");
+  const [leftOpen, setLeftOpen] = useState(initialSidebarOpen);
   const [hidden, setHidden] = useState<Set<string>>(new Set());
   const [error, setError] = useState("");
 
@@ -150,7 +152,7 @@ export function DashboardShell({ user, role, scope, cities, mine, jobs, links, l
 
   return (
     <>
-      <div className="fixed inset-0 z-0" aria-hidden="true">
+      <div className="scene-bg fixed inset-0 z-0" aria-hidden="true">
         <GraphBoundary>
           <Graph3D data={data} have={have} learning={learning} hidden={hidden} selectedId={selected?.id ?? null} onSelect={setSelected} card={card} width={width} height={height} />
         </GraphBoundary>
@@ -159,16 +161,31 @@ export function DashboardShell({ user, role, scope, cities, mine, jobs, links, l
       {/* Mobile: the panels stack over the graph. Desktop: they slide out from the screen edges (Saagii's mockup). */}
       <div className="pointer-events-none relative z-10 flex flex-col gap-4 lg:contents">
         {/* LEFT: one white card (you, saved, started) and one solid black card (next skill). No cards inside cards. */}
-        <div className="flex flex-col gap-4 lg:fixed lg:top-[122px] lg:bottom-0 lg:left-0 lg:w-[clamp(250px,18.6vw,330px)] lg:gap-[30px]">
+        <div
+          id="left-sidebar"
+          inert={!leftOpen}
+          className={`flex flex-col gap-4 lg:fixed lg:top-[122px] lg:bottom-0 lg:left-0 lg:w-[clamp(250px,18.6vw,330px)] lg:gap-[30px] lg:transition-transform lg:duration-500 lg:ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none ${leftOpen ? "" : "lg:-translate-x-[calc(100%+24px)]"}`}
+        >
         <section className="surface rise-in pointer-events-auto flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto p-6 lg:rounded-l-none lg:rounded-r-[40px]">
-          <div className="flex items-center gap-3">
-            <Avatar className="size-12">
-              {user.picture && <AvatarImage src={user.picture} alt="" />}
-              <AvatarFallback className="bg-secondary text-sm font-medium">{initials}</AvatarFallback>
-            </Avatar>
-            <div className="min-w-0">
-              <p className="text-xl leading-tight font-medium tracking-tight break-words">{user.name}</p>
-              <p className="text-sm text-muted-foreground">{role} · {scope.kind === "canada" ? "Canada" : scope.city}</p>
+          <div className="space-y-3">
+            <div className="flex items-start justify-between">
+              <Avatar className="size-12">
+                {user.picture && <AvatarImage src={user.picture} alt="" />}
+                <AvatarFallback className="bg-secondary text-sm font-medium">{initials}</AvatarFallback>
+              </Avatar>
+              <button
+                aria-label="Collapse sidebar"
+                aria-controls="left-sidebar"
+                aria-expanded={leftOpen}
+                onClick={() => setLeftOpen(false)}
+                className="hidden size-8 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground lg:grid"
+              >
+                <PanelLeftCloseIcon className="size-4" />
+              </button>
+            </div>
+            <div>
+              <p className="text-2xl leading-tight font-medium tracking-tight break-words">{user.name}</p>
+              <p className="mt-0.5 text-sm text-muted-foreground">{role} · {scope.kind === "canada" ? "Canada" : scope.city}</p>
             </div>
           </div>
 
@@ -232,6 +249,19 @@ export function DashboardShell({ user, role, scope, cities, mine, jobs, links, l
           </section>
         )}
         </div>
+
+        {!leftOpen && (
+          <button
+            aria-label="Open sidebar"
+            aria-controls="left-sidebar"
+            aria-expanded={false}
+            onClick={() => setLeftOpen(true)}
+            className="surface rise-in pointer-events-auto fixed top-[122px] left-0 z-20 hidden items-center gap-2 rounded-l-none rounded-r-full py-3 pr-4 pl-3 text-sm font-medium transition-transform active:scale-[0.98] lg:flex"
+          >
+            <PanelLeftOpenIcon className="size-4" />
+            {initials}
+          </button>
+        )}
 
         <div className="contents">
           <div className="pointer-events-none hidden text-center lg:fixed lg:inset-x-0 lg:top-[68px] lg:block">
