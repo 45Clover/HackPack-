@@ -3,6 +3,7 @@ import { auth0, authReady } from "@/lib/auth0";
 import { getNotifications, getProfile } from "@/lib/dashboard";
 import { buttonVariants } from "@/components/ui/button";
 import { NavMenu, NotificationsMenu, UserMenu } from "@/components/header-menus";
+import { LiquidTopBar } from "@/components/liquid";
 
 // Top bar: [menu] HackPack ............ [notifications] [profile]
 export async function SiteHeader() {
@@ -12,10 +13,10 @@ export async function SiteHeader() {
     : [];
 
   return (
-    <header className="sticky top-3 z-30 mx-auto w-full max-w-[1600px] px-4">
-      <nav className="glass flex items-center gap-2 rounded-full px-3 py-1.5">
+    <LiquidTopBar>
+      <nav className="flex h-[62px] w-[calc(100vw-16px)] items-center gap-2 px-3 pt-[10px] text-sm text-foreground lg:w-[78vw]">
         <NavMenu signedIn={!!session} />
-        <Link href="/" className="font-semibold tracking-tight">HackPack</Link>
+        <Link href="/" className="text-[15px] font-semibold tracking-tight">HackPack</Link>
         <div className="ml-auto flex items-center gap-1">
           {session ? (
             <>
@@ -28,6 +29,6 @@ export async function SiteHeader() {
           )}
         </div>
       </nav>
-    </header>
+    </LiquidTopBar>
   );
 }
