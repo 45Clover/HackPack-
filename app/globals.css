@@ -7,9 +7,9 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-sans);
+  --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-  --font-heading: var(--font-sans);
+  --font-heading: var(--font-geist-sans);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -49,25 +49,25 @@
 }
 
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
+  --background: #f4f3ef;
+  --foreground: #141413;
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.145 0 0);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.145 0 0);
   --primary: oklch(0.205 0 0);
   --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
+  --secondary: #ecebe6;
   --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
+  --muted: #ecebe6;
+  --muted-foreground: #6d6c66;
+  --accent: #ecebe6;
   --accent-foreground: oklch(0.205 0 0);
   --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.87 0 0);
+  --border: rgb(20 20 19 / 0.08);
+  --input: #ecebe6;
+  --ring: #2f5bea;
+  --chart-1: #2f5bea;
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);
   --chart-4: oklch(0.371 0 0);
@@ -84,25 +84,25 @@
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
+  --background: #05070d;
+  --foreground: #eceef3;
+  --card: rgb(14 17 26 / 0.86);
   --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
+  --popover: rgb(16 19 29 / 0.92);
   --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
+  --primary: #eceef3;
+  --primary-foreground: #0b0d14;
   --secondary: oklch(0.269 0 0);
   --secondary-foreground: oklch(0.985 0 0);
   --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
+  --muted-foreground: #9aa0ae;
   --accent: oklch(0.269 0 0);
   --accent-foreground: oklch(0.985 0 0);
   --destructive: oklch(0.704 0.191 22.216);
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
+  --ring: #f2c46d;
+  --chart-1: #f2c46d;
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);
   --chart-4: oklch(0.371 0 0);
@@ -128,3 +128,65 @@
     @apply font-sans;
   }
 }
+/* ---------- HackPack: solid colours on warm white (reference 3) ---------- */
+:root {
+  --blue: #2f5bea;   /* the one accent: you, progress, focus */
+  --have: #1f9e6e;   /* "you have this" */
+  --ink: #141413;    /* the solid black card and primary pills */
+}
+
+/* One surface: solid white, big radius, soft shadow. Never nested inside another surface. */
+@layer components {
+  .surface {
+    background: #fff;
+    border-radius: 1.75rem;
+    box-shadow: 0 1px 2px rgb(20 20 19 / 0.04), 0 18px 40px -22px rgb(20 20 19 / 0.18);
+  }
+  .surface-ink {
+    background: var(--ink);
+    color: #f4f3ef;
+    border-radius: 1.75rem;
+  }
+  .eyebrow {
+    font-size: 12px;
+    color: var(--muted-foreground);
+  }
+}
+
+/* Labels the 3D graph floats next to nodes. A white halo keeps them readable over links. */
+.graph-label {
+  font: 500 11px/1 var(--font-geist-sans), system-ui, sans-serif;
+  color: #2a2a28;
+  text-shadow: 0 0 3px #f4f3ef, 0 0 6px #f4f3ef;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.graph-label[data-kind="job"] { color: #6d6c66; font-size: 10.5px; }
+.graph-label[data-kind="me"] { color: var(--blue); font-weight: 600; }
+
+@keyframes rise-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+/* No fill-mode on purpose: if the animation never runs, the element is still fully visible. */
+.rise-in { animation: rise-in 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
+@media (prefers-reduced-motion: reduce) {
+  .rise-in { animation: none; }
+}
+
+/* Depth behind the graph: a soft studio light (bright centre, warmer edges) plus a faint paper grain. */
+.scene-bg {
+  background: radial-gradient(120% 95% at 50% 40%, #fcfbf8 0%, #f4f3ef 48%, #e6e3db 100%);
+}
+.scene-bg::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.07;
+  mix-blend-mode: multiply;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.3  0 0 0 0 0.28  0 0 0 0 0.25  0 0 0 0.9 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+}
+
+/* Small cards on the neighbours of the selected node: they sit just above their node. */
+.mini-wrap { transform: translate(0, calc(-50% - 22px)); }

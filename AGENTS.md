@@ -22,19 +22,21 @@ Next.js 16 · **Neon** (plain Postgres, `postgres` client) · **Auth0** · **n8n
 2. **Claim your task on the job board** before coding (`CLAIM T2 · agent for @user`). First claim wins.
 3. The tutorial comment has the code for every task. This base already contains the shared pieces listed below.
 
-## Who owns what. Edit ONLY your own files.
+## Who owns what. Edit ONLY your own files. (Plan v2.1: see the hub issue)
 | Role | Person | Owns |
 |---|---|---|
-| UI / UX | @SaagiiSG | `app/**/page.tsx`, `app/layout.tsx`, `components/**`, `lib/scope.ts`, `lib/ago.ts` |
-| Platform + auth | @fabf28 | `package.json`, `.gitignore`, `.env.example`, `db/schema.sql`, `lib/db.ts`, `lib/auth0.ts`, `proxy.ts`, `app/api/me/**`, Vercel / Auth0 / n8n / DNS |
-| Job data | @45Clover | `lib/boards.ts`, `lib/feeds.ts`, `lib/location.ts` (+ test), `lib/ingest.ts`, `scripts/ingest.ts`, `app/api/ingest/**` |
-| AI + outside APIs | @tomi-alo | `lib/skills.ts` (+ test), `lib/extract.ts`, `lib/extras.ts` |
-| People + pitch | (open) | `db/stories.sql`, Devpost page, video, pitch |
+| UI / UX | @SaagiiSG | `app/**/page.tsx`, `app/layout.tsx`, `components/**`, `lib/scope.ts`, `lib/ago.ts`, `lib/dashboard.ts`, `lib/roles.ts`, `lib/resume.ts`, `lib/categories.ts`, `lib/auth0.ts`, `proxy.ts`, `app/api/resume/**`, `app/api/onboarding/**`, `db/003_profiles.sql` |
+| Platform | @fabf28 | `package.json`, `.gitignore`, `.env.example`, `db/schema.sql`, `lib/db.ts`, Neon, Vercel, the Auth0 dashboard (app, callbacks, passkeys), domain |
+| Job data | @45Clover | the **n8n workflow**, `lib/location.ts` (+ test), `app/api/ingest/**` |
+| AI | @tomi-alo | `lib/skills.ts` (+ test), `lib/extract.ts`, `lib/extract-prompt.ts`, `lib/extras.ts`, `app/api/extract/**`, `db/002_skill_categories.sql` |
+| People + pitch | Christopher? | `db/stories.sql`, Devpost page, video, pitch |
+
+**Database setup (run in Neon, in order):** `db/schema.sql` → `db/002_skill_categories.sql` → `db/003_profiles.sql` → `db/004_saved_jobs.sql` → `db/005_project_urls.sql`.
 
 Need a change in someone else's file? Comment on the hub issue and @ them. Don't edit it yourself.
 
 ## Stubs already in this base (replace the body, keep the signature)
-- `lib/auth0.ts`: `auth0.getSession()` returns `null` until Platform swaps in the real `Auth0Client` (tutorial T6) and adds `proxy.ts`.
+- `lib/auth0.ts` + `proxy.ts` are **real**. They read the five `AUTH0_*`/`APP_BASE_URL` env vars on the first request, so every page needs them in `.env.local`.
 - `lib/skills.ts`, `lib/extract.ts`, `lib/extras.ts`: AI fills these in (tutorial T3, T7).
 - `lib/location.ts` is **real** (with a test). Ingest must use it: skip jobs where `!parseLocation(loc).canada`, and save `city` + `remote`.
 

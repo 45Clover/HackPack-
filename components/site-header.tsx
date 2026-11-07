@@ -1,18 +1,32 @@
 import Link from "next/link";
-import { auth0 } from "@/lib/auth0";
+import { auth0, authReady } from "@/lib/auth0";
+import { getNotifications, getProfile } from "@/lib/dashboard";
+import { buttonVariants } from "@/components/ui/button";
+import { NavMenu, NotificationsMenu, UserMenu } from "@/components/header-menus";
 
+// Top bar: [menu] HackPack ............ [notifications] [profile]
 export async function SiteHeader() {
-  const session = await auth0.getSession();
+  const session = authReady ? await auth0.getSession() : null;
+  const notifications = session
+    ? await getNotifications(session.user.sub, (await getProfile(session.user.sub))?.city ?? null)
+    : [];
+
   return (
-    <header className="border-b">
-      <nav className="mx-auto flex max-w-6xl items-center gap-6 px-4 py-3 text-sm">
-        <Link href="/" className="font-semibold">HackPack</Link>
-        <Link href="/me">My skills</Link>
-        <Link href="/about">About</Link>
-        {/* Plain <a>: Auth0 routes need a full page load, not client navigation. */}
-        <span className="ml-auto">
-          {session ? <a href="/auth/logout">Sign out</a> : <a href="/auth/login">Sign in</a>}
-        </span>
+    <header className="fixed inset-x-2 top-0 z-30 lg:inset-x-[11vw]">
+      <nav className="surface flex h-[52px] items-center gap-2 rounded-t-none rounded-b-[22px] px-3">
+        <NavMenu signedIn={!!session} />
+        <Link href="/" className="text-[15px] font-semibold tracking-tight">HackPack</Link>
+        <div className="ml-auto flex items-center gap-1">
+          {session ? (
+            <>
+              <NotificationsMenu items={notifications} />
+              <UserMenu name={session.user.name ?? "You"} picture={session.user.picture ?? null} />
+            </>
+          ) : (
+            // Plain <a>: Auth0 routes need a full page load, not client navigation.
+            <a href="/auth/login?returnTo=/onboarding" className={buttonVariants({ size: "sm" })}>Sign in</a>
+          )}
+        </div>
       </nav>
     </header>
   );
