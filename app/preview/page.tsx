@@ -21,7 +21,7 @@ const DICT = CATEGORIES.flatMap((c, ci) =>
 type AshbyJob = { id: string; title: string; jobUrl: string; location: string; isRemote: boolean; publishedAt: string; descriptionPlain?: string; isListed: boolean };
 
 export default async function Preview({ searchParams }: PageProps<"/preview">) {
-  const { focus, sidebar } = await searchParams;
+  const { focus, sidebar, view } = await searchParams;
   if (process.env.NODE_ENV !== "development") notFound();
 
   const feeds = await Promise.all(
@@ -76,6 +76,7 @@ export default async function Preview({ searchParams }: PageProps<"/preview">) {
         persist={false}
         initialFocus={typeof focus === "string" ? focus : undefined}
         initialSidebarOpen={sidebar !== "closed"}
+        initialView={view === "tree" ? "tree" : "map"}
       />
     </>
   );

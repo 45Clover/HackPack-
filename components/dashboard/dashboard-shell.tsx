@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import {
-  ArrowLeftIcon, ArrowUpRightIcon, BookmarkIcon, BookmarkCheckIcon, CheckIcon, PanelLeftCloseIcon, PanelLeftOpenIcon, SlidersHorizontalIcon, XIcon,
+  ArrowLeftIcon, ArrowUpRightIcon, BookmarkIcon, BookmarkCheckIcon, CheckIcon, ChevronLeftIcon, ChevronRightIcon, SlidersHorizontalIcon, XIcon,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -14,6 +14,7 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import {
   DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { ScopeSwitch } from "@/components/scope-switch";
 import { CATEGORIES, categoryColor } from "@/lib/categories";
@@ -22,6 +23,7 @@ import type { GraphJob, GraphLink, Leader, MySkill, SavedJob } from "@/lib/dashb
 import type { Scope } from "@/lib/scope";
 import type { GLink, GNode } from "./graph-3d";
 import { GraphBoundary } from "./graph-boundary";
+import { SkillTree } from "./skill-tree";
 
 const Graph3D = dynamic(() => import("./graph-3d"), {
   ssr: false,
@@ -48,9 +50,10 @@ type Props = {
   persist: boolean; // false on /preview: changes stay in the browser
   initialFocus?: string; // e.g. "s:react" or "j:<job id>": open with that node selected
   initialSidebarOpen?: boolean;
+  initialView?: "map" | "tree";
 };
 
-export function DashboardShell({ user, role, scope, cities, mine, jobs, links, leaders, saved: initialSaved, started, persist, initialFocus, initialSidebarOpen = true }: Props) {
+export function DashboardShell({ user, role, scope, cities, mine, jobs, links, leaders, saved: initialSaved, started, persist, initialFocus, initialSidebarOpen = true, initialView = "map" }: Props) {
   const router = useRouter();
   const skills = useMemo(() => {
     const m = new Map<string, Skill>();
@@ -66,6 +69,9 @@ export function DashboardShell({ user, role, scope, cities, mine, jobs, links, l
   const [focusId] = useState(initialFocus ?? null);
   const [tab, setTab] = useState<"skills" | "jobs">("skills");
   const [leftOpen, setLeftOpen] = useState(initialSidebarOpen);
+  const [currentSlug, setCurrentSlug] = useState<string | null>(null);
+  const [view, setView] = useState<"map" | "tree">(initialView);
+  const [projectUrl, setProjectUrl] = useState("");
   const [hidden, setHidden] = useState<Set<string>>(new Set());
   const [error, setError] = useState("");
 
@@ -98,6 +104,12 @@ export function DashboardShell({ user, role, scope, cities, mine, jobs, links, l
     return slug ? { skill: skills.get(slug)!, jobs: n } : null;
   }, [links, have, skills]);
 
+  const jobCount = useMemo(() => {
+    const m = new Map<string, Set<string>>();
+    for (const l of links) (m.get(l.slug) ?? m.set(l.slug, new Set()).get(l.slug)!).add(l.job_id);
+    return new Map([...m].map(([slug, ids]) => [slug, ids.size]));
+  }, [links]);
+
   // The constellation fills the window.
   const width = useSyncExternalStore(onResize, () => window.innerWidth, () => 1280);
   const height = useSyncExternalStore(onResize, () => window.innerHeight, () => 800);
@@ -109,7 +121,7 @@ export function DashboardShell({ user, role, scope, cities, mine, jobs, links, l
     return !!res?.ok;
   }
 
-  async function setSkillStatus(slug: string, status: "have" | "learning" | "none") {
+  async function setSkillStatus(slug: string, status: "have" | "learning" | "none", project?: string) {
     const skill = skills.get(slug);
     if (!skill) return;
     const before = { have: new Set(have), learning: new Set(learning) };
@@ -120,7 +132,7 @@ export function DashboardShell({ user, role, scope, cities, mine, jobs, links, l
     if (status === "learning") nextLearning.add(slug);
     setHave(nextHave);
     setLearning(nextLearning);
-    if (!(await persistCall("/api/skill-status", { skillId: skill.id, status }))) {
+    if (!(await persistCall("/api/skill-status", { skillId: skill.id, status, projectUrl: project }))) {
       setHave(before.have);
       setLearning(before.learning);
     }
@@ -134,6 +146,15 @@ export function DashboardShell({ user, role, scope, cities, mine, jobs, links, l
   }
 
   const select = (id: string) => setSelected(data.nodes.find((n) => n.id === id) ?? null);
+  const startedList = [...learning];
+  const learningNow = currentSlug && learning.has(currentSlug) ? currentSlug : startedList[startedList.length - 1] ?? null;
+  const projectOk = /^https?:\/\/\S+\.\S+/.test(projectUrl.trim());
+  async function finishLearning() {
+    if (!learningNow || !projectOk) return;
+    await setSkillStatus(learningNow, "have", projectUrl.trim());
+    setProjectUrl("");
+    setCurrentSlug(null);
+  }
   useEffect(() => {
     if (!focusId) return;
     const t = setTimeout(() => setSelected(data.nodes.find((n) => n.id === focusId) ?? null), 2500); // after the layout settles
@@ -147,41 +168,52 @@ export function DashboardShell({ user, role, scope, cities, mine, jobs, links, l
   const card = selectedJob ? (
     <JobCard job={selectedJob} match={matchOf(selectedJob.id)} isSaved={saved.some((s) => s.id === selectedJob.id)} onSave={() => toggleSaved(selectedJob)} />
   ) : selectedSkill ? (
-    <SkillCard skill={selectedSkill} status={have.has(selectedSkill.slug) ? "have" : learning.has(selectedSkill.slug) ? "learning" : "none"} onStatus={(s) => setSkillStatus(selectedSkill.slug, s)} />
+    <SkillCard
+      skill={selectedSkill}
+      status={have.has(selectedSkill.slug) ? "have" : learning.has(selectedSkill.slug) ? "learning" : "none"}
+      onStart={() => { setSkillStatus(selectedSkill.slug, "learning"); setCurrentSlug(selectedSkill.slug); }}
+      onFinish={() => { setCurrentSlug(selectedSkill.slug); document.getElementById("project-url")?.focus(); }}
+    />
   ) : null;
 
   return (
     <>
       <div className="scene-bg fixed inset-0 z-0" aria-hidden="true">
+        {view === "map" && (
         <GraphBoundary>
           <Graph3D data={data} have={have} learning={learning} hidden={hidden} selectedId={selected?.id ?? null} onSelect={setSelected} card={card} width={width} height={height} />
         </GraphBoundary>
+        )}
       </div>
+
+      {/* 2D view: the skill tree, in the space between the panels. */}
+      {view === "tree" && (
+        <div className="relative z-[5] overflow-auto lg:fixed lg:top-[190px] lg:right-[calc(clamp(270px,19.8vw,350px)+16px)] lg:bottom-[84px] lg:left-[calc(clamp(250px,18.6vw,330px)+16px)]">
+          <SkillTree
+            skills={[...skills.values()]}
+            have={have}
+            learning={learning}
+            hidden={hidden}
+            jobCount={jobCount}
+            nextSlug={nextSkill?.skill.slug ?? null}
+            selectedSlug={selectedSkill?.slug ?? null}
+            onSelect={(slug) => select(`s:${slug}`)}
+          />
+        </div>
+      )}
 
       {/* Mobile: the panels stack over the graph. Desktop: they slide out from the screen edges (Saagii's mockup). */}
       <div className="pointer-events-none relative z-10 flex flex-col gap-4 lg:contents">
-        {/* LEFT: one white card (you, saved, started) and one solid black card (next skill). No cards inside cards. */}
-        <div
-          id="left-sidebar"
-          inert={!leftOpen}
-          className={`flex flex-col gap-4 lg:fixed lg:top-[122px] lg:bottom-0 lg:left-0 lg:w-[clamp(250px,18.6vw,330px)] lg:gap-[30px] lg:transition-transform lg:duration-500 lg:ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none ${leftOpen ? "" : "lg:-translate-x-[calc(100%+24px)]"}`}
-        >
-        <section className="surface rise-in pointer-events-auto flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto p-6 lg:rounded-l-none lg:rounded-r-[40px]">
+        {/* LEFT: the student card (collapsible) and the black Learning card (always there). No cards inside cards. */}
+        <div className="flex flex-col gap-4 lg:fixed lg:top-[122px] lg:bottom-0 lg:left-0 lg:w-[clamp(250px,18.6vw,330px)] lg:gap-[30px]">
+        <div className={`relative min-h-0 flex-1 lg:transition-transform lg:duration-500 lg:ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none ${leftOpen ? "" : "lg:-translate-x-full"}`}>
+        <section id="student-card" inert={!leftOpen} className="surface rise-in pointer-events-auto flex h-full flex-col gap-6 overflow-y-auto p-6 lg:rounded-l-none lg:rounded-r-[40px]">
           <div className="space-y-3">
-            <div className="flex items-start justify-between">
+            <div>
               <Avatar className="size-12">
                 {user.picture && <AvatarImage src={user.picture} alt="" />}
                 <AvatarFallback className="bg-secondary text-sm font-medium">{initials}</AvatarFallback>
               </Avatar>
-              <button
-                aria-label="Collapse sidebar"
-                aria-controls="left-sidebar"
-                aria-expanded={leftOpen}
-                onClick={() => setLeftOpen(false)}
-                className="hidden size-8 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground lg:grid"
-              >
-                <PanelLeftCloseIcon className="size-4" />
-              </button>
             </div>
             <div>
               <p className="text-2xl leading-tight font-medium tracking-tight break-words">{user.name}</p>
@@ -214,17 +246,16 @@ export function DashboardShell({ user, role, scope, cities, mine, jobs, links, l
             ))}
           </PanelList>
 
-          <PanelList title="Started" count={learning.size} empty="Start a skill from its card, then tick it off once you've learned it.">
-            {[...learning].map((slug) => skills.get(slug)).filter((s): s is Skill => !!s).map((s) => (
+          <PanelList title="Started" count={learning.size} empty="Start a skill from its card. It stays in Learning until you finish it with a project.">
+            {startedList.map((slug) => skills.get(slug)).filter((s): s is Skill => !!s).map((s) => (
               <li key={s.slug} className="flex items-center gap-2.5">
                 <button
-                  aria-label={`Mark ${s.name} as learned`}
-                  className="size-4 shrink-0 rounded-[5px] border-[1.5px] border-foreground/30 hover:border-[var(--have)] hover:bg-[var(--have)]/15"
-                  onClick={() => setSkillStatus(s.slug, "have")}
-                />
-                <button className="flex min-w-0 flex-1 items-center gap-2 text-left text-sm" onClick={() => select(`s:${s.slug}`)}>
+                  className="flex min-w-0 flex-1 items-center gap-2 text-left text-sm"
+                  aria-current={s.slug === learningNow}
+                  onClick={() => { setCurrentSlug(s.slug); select(`s:${s.slug}`); }}
+                >
                   <span aria-hidden className="size-2 shrink-0 rounded-full" style={{ background: categoryColor(s.category) }} />
-                  <span className="truncate">{s.name}</span>
+                  <span className={`truncate ${s.slug === learningNow ? "font-medium" : ""}`}>{s.name}</span>
                 </button>
                 <button aria-label={`Stop learning ${s.name}`} className="text-muted-foreground hover:text-foreground" onClick={() => setSkillStatus(s.slug, "none")}><XIcon className="size-3.5" /></button>
               </li>
@@ -234,34 +265,60 @@ export function DashboardShell({ user, role, scope, cities, mine, jobs, links, l
           <Link href="/onboarding" className="mt-auto text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline">Edit skills &amp; resume</Link>
           {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
         </section>
-
-        {nextSkill && (
+          {/* One chevron: rides on the card's edge, and stays at the screen edge when the card is tucked away. */}
+          <button
+            aria-label={leftOpen ? "Collapse your card" : "Expand your card"}
+            aria-controls="student-card"
+            aria-expanded={leftOpen}
+            onClick={() => setLeftOpen(!leftOpen)}
+            className={`surface pointer-events-auto absolute top-8 z-10 hidden size-8 place-items-center rounded-full text-muted-foreground transition-colors hover:text-foreground lg:grid ${leftOpen ? "-right-4" : "-right-12"}`}
+          >
+            {leftOpen ? <ChevronLeftIcon className="size-4" /> : <ChevronRightIcon className="size-4" />}
+          </button>
+        </div>
+        {/* The black card: what you're learning now (finish it with a project), else the next skill to start. */}
+        {learningNow && skills.get(learningNow) ? (
+          <section className="surface-ink rise-in pointer-events-auto shrink-0 space-y-3 p-6 lg:rounded-none lg:rounded-tr-[40px]">
+            <p className="text-sm text-white/60">Learning now</p>
+            <p className="text-[40px] leading-[1.05] font-medium tracking-tight break-words">{skills.get(learningNow)!.name}</p>
+            <p className="text-sm text-white/60">Finish it by sharing a project that uses it.</p>
+            <form className="space-y-2" onSubmit={(e) => { e.preventDefault(); finishLearning(); }}>
+              <label htmlFor="project-url" className="sr-only">Project link</label>
+              <Input
+                id="project-url"
+                type="url"
+                inputMode="url"
+                placeholder="https://github.com/you/project"
+                value={projectUrl}
+                onChange={(e) => setProjectUrl(e.target.value)}
+                className="h-10 rounded-full border-white/15 bg-white/10 px-4 text-white placeholder:text-white/40"
+              />
+              <button
+                type="submit"
+                disabled={!projectOk}
+                className="rounded-full bg-white px-4 py-2 text-sm font-medium text-[var(--ink)] transition-transform active:scale-[0.98] disabled:opacity-40"
+              >
+                I&apos;ve learned it
+              </button>
+            </form>
+          </section>
+        ) : nextSkill ? (
           <section className="surface-ink rise-in pointer-events-auto shrink-0 space-y-3 p-6 lg:rounded-none lg:rounded-tr-[40px]">
             <p className="text-sm text-white/60">Next skill</p>
-            <p className="text-[40px] leading-[1.05] font-medium tracking-tight">{nextSkill.skill.name}</p>
+            <p className="text-[40px] leading-[1.05] font-medium tracking-tight break-words">{nextSkill.skill.name}</p>
             <p className="text-sm text-white/60">Asked for in {nextSkill.jobs} of your closest jobs</p>
-            <button
-              className="rounded-full bg-white px-4 py-2 text-sm font-medium text-[var(--ink)] transition-transform active:scale-[0.98]"
-              onClick={() => select(`s:${nextSkill.skill.slug}`)}
-            >
-              Show me where
-            </button>
+            <div className="flex flex-wrap gap-2">
+              <button
+                className="rounded-full bg-white px-4 py-2 text-sm font-medium text-[var(--ink)] transition-transform active:scale-[0.98]"
+                onClick={() => { setSkillStatus(nextSkill.skill.slug, "learning"); setCurrentSlug(nextSkill.skill.slug); }}
+              >
+                Start learning
+              </button>
+              <button className="rounded-full px-3 py-2 text-sm text-white/70 hover:text-white" onClick={() => select(`s:${nextSkill.skill.slug}`)}>Show me where</button>
+            </div>
           </section>
-        )}
+        ) : null}
         </div>
-
-        {!leftOpen && (
-          <button
-            aria-label="Open sidebar"
-            aria-controls="left-sidebar"
-            aria-expanded={false}
-            onClick={() => setLeftOpen(true)}
-            className="surface rise-in pointer-events-auto fixed top-[122px] left-0 z-20 hidden items-center gap-2 rounded-l-none rounded-r-full py-3 pr-4 pl-3 text-sm font-medium transition-transform active:scale-[0.98] lg:flex"
-          >
-            <PanelLeftOpenIcon className="size-4" />
-            {initials}
-          </button>
-        )}
 
         <div className="contents">
           <div className="pointer-events-none hidden text-center lg:fixed lg:inset-x-0 lg:top-[68px] lg:block">
@@ -269,6 +326,18 @@ export function DashboardShell({ user, role, scope, cities, mine, jobs, links, l
             <p className="mt-1 text-sm text-muted-foreground">
               {scope.kind === "canada" ? "Canada" : scope.city} · {jobs.length} closest jobs · {have.size} skills
             </p>
+            <div className="pointer-events-auto mt-3 inline-flex rounded-full bg-white p-1 shadow-[0_1px_2px_rgb(20_20_19/0.06)]" role="group" aria-label="View">
+              {(["map", "tree"] as const).map((v) => (
+                <button
+                  key={v}
+                  aria-pressed={view === v}
+                  onClick={() => setView(v)}
+                  className={`rounded-full px-4 py-1.5 text-[13px] transition-colors ${view === v ? "bg-[var(--ink)] text-white" : "text-muted-foreground hover:text-foreground"}`}
+                >
+                  {v === "map" ? "3D map" : "Skill tree"}
+                </button>
+              ))}
+            </div>
           </div>
           <nav aria-label="Focus one category" className="surface pointer-events-auto hidden max-w-[calc(100vw-clamp(250px,18.6vw,330px)-clamp(270px,19.8vw,350px)-48px)] items-center gap-0.5 overflow-x-auto rounded-full p-1.5 [scrollbar-width:none] lg:fixed lg:bottom-5 lg:left-1/2 lg:flex lg:-translate-x-1/2">
             {[{ slug: "all", name: "All" }, ...CATEGORIES.filter((c) => [...skills.values()].some((sk) => sk.category === c.slug))].map((c) => {
@@ -430,7 +499,7 @@ function JobCard({ job, match, isSaved, onSave }: { job: GraphJob; match: { have
   );
 }
 
-function SkillCard({ skill, status, onStatus }: { skill: Skill; status: "have" | "learning" | "none"; onStatus: (s: "have" | "learning" | "none") => void }) {
+function SkillCard({ skill, status, onStart, onFinish }: { skill: Skill; status: "have" | "learning" | "none"; onStart: () => void; onFinish: () => void }) {
   const category = CATEGORIES.find((c) => c.slug === skill.category)?.name ?? "Skill";
   return (
     <FloatingCard>
@@ -439,8 +508,8 @@ function SkillCard({ skill, status, onStatus }: { skill: Skill; status: "have" |
         <p className="text-muted-foreground">{category} · {status === "have" ? "on your resume" : status === "learning" ? "you're learning it" : "not on your resume yet"}</p>
       </div>
       <div className="flex flex-wrap gap-2">
-        {status === "none" && <Button size="sm" onClick={() => onStatus("learning")} className="active:scale-[0.98]">Start learning</Button>}
-        {status === "learning" && <Button size="sm" onClick={() => onStatus("have")} className="active:scale-[0.98]"><CheckIcon />I&apos;ve learned it</Button>}
+        {status === "none" && <Button size="sm" onClick={onStart} className="active:scale-[0.98]">Start learning</Button>}
+        {status === "learning" && <Button size="sm" onClick={onFinish} className="active:scale-[0.98]">Finish with a project</Button>}
         <Link href={`/skills/${skill.slug}`} className={buttonVariants({ size: "sm", variant: "ghost" })}>Where to learn<ArrowUpRightIcon /></Link>
       </div>
     </FloatingCard>

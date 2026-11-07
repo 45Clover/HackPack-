@@ -31,7 +31,7 @@ Next.js 16 · **Neon** (plain Postgres, `postgres` client) · **Auth0** · **n8n
 | AI | @tomi-alo | `lib/skills.ts` (+ test), `lib/extract.ts`, `lib/extract-prompt.ts`, `lib/extras.ts`, `app/api/extract/**`, `db/002_skill_categories.sql` |
 | People + pitch | Christopher? | `db/stories.sql`, Devpost page, video, pitch |
 
-**Database setup (run in Neon, in order):** `db/schema.sql` → `db/002_skill_categories.sql` → `db/003_profiles.sql` → `db/004_saved_jobs.sql`.
+**Database setup (run in Neon, in order):** `db/schema.sql` → `db/002_skill_categories.sql` → `db/003_profiles.sql` → `db/004_saved_jobs.sql` → `db/005_project_urls.sql`.
 
 Need a change in someone else's file? Comment on the hub issue and @ them. Don't edit it yourself.
 
