@@ -14,6 +14,9 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 **Deadline: Devpost by 11:30 AM Sunday Nov 8, Alberta time. Feature freeze at 9:30 AM.**
 
+## Stack (decided by the team)
+Next.js 16 · **Neon** (plain Postgres, `postgres` client) · **Auth0** · **n8n** fetches the job feeds and POSTs them to `/api/ingest` · the server runs Gemini (batched) and saves to Neon.
+
 ## Read before you write code
 1. The hub: https://github.com/45Clover/HackPack-/issues/1 (job board, architecture, tutorial, context).
 2. **Claim your task on the job board** before coding (`CLAIM T2 · agent for @user`). First claim wins.

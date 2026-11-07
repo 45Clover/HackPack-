@@ -1,4 +1,4 @@
--- Run once in the Tiger Cloud SQL editor (or: psql "$DATABASE_URL" -f db/schema.sql).
+-- Run once in the Neon SQL editor (or: psql "$DATABASE_URL" -f db/schema.sql). Plain Postgres, no extensions.
 -- Owner: Platform (@fabf28). Everyone codes against these tables.
 
 create table companies (
@@ -30,14 +30,14 @@ create table skills (
   category text
 );
 
--- One row per (job, skill). The time-series table.
+-- One row per (job, skill).
 create table job_skills (
   job_id    text not null references jobs(id) on delete cascade,
   skill_id  int  not null references skills(id),
-  posted_at timestamptz not null,            -- copied from jobs so Tiger can bucket by time
+  posted_at timestamptz not null,            -- copied from jobs so demand-over-time queries skip a join
   primary key (job_id, skill_id, posted_at)
 );
-select create_hypertable('job_skills', by_range('posted_at'));
+create index job_skills_skill_time_idx on job_skills (skill_id, posted_at);
 
 create table skill_extras (                  -- cache for slow outside APIs
   skill_id     int primary key references skills(id),
