@@ -22,6 +22,7 @@ import type { GraphJob, GraphLink, Leader, MySkill, SavedJob } from "@/lib/dashb
 import type { Scope } from "@/lib/scope";
 import type { GLink, GNode } from "./graph-3d";
 import { GraphBoundary } from "./graph-boundary";
+import { LiquidDock } from "@/components/liquid";
 
 const Graph3D = dynamic(() => import("./graph-3d"), {
   ssr: false,
@@ -156,9 +157,11 @@ export function DashboardShell({ user, role, scope, cities, mine, jobs, links, l
         </GraphBoundary>
       </div>
 
-      <div className="pointer-events-none relative z-10 grid gap-4 lg:grid-cols-[minmax(260px,20%)_1fr_minmax(300px,22%)]">
+      {/* Mobile: the panels stack over the graph. Desktop: they slide out from the screen edges (Saagii's mockup). */}
+      <div className="pointer-events-none relative z-10 flex flex-col gap-4 lg:contents">
         {/* LEFT: you, next skill, saved, started */}
-        <aside className="glass glass-in pointer-events-auto flex max-h-[calc(100dvh-7.5rem)] flex-col gap-6 self-start overflow-y-auto p-5 lg:sticky lg:top-24">
+        <div className="flex flex-col gap-4 lg:fixed lg:top-[122px] lg:bottom-0 lg:left-0 lg:w-[clamp(250px,18.6vw,330px)] lg:gap-[30px]">
+        <section className="glass glass-in pointer-events-auto flex shrink-0 flex-col gap-5 p-5 lg:rounded-l-none lg:rounded-r-[40px] lg:border-l-0 lg:pl-6">
           <div className="flex flex-col items-center gap-2 pt-1 text-center">
             <Avatar className="size-16 ring-2 ring-white/15 ring-offset-2 ring-offset-transparent">
               {user.picture && <AvatarImage src={user.picture} alt="" />}
@@ -189,6 +192,8 @@ export function DashboardShell({ user, role, scope, cities, mine, jobs, links, l
             </div>
           )}
 
+        </section>
+        <section className="glass glass-in pointer-events-auto flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto p-5 lg:rounded-none lg:rounded-tr-[40px] lg:border-b-0 lg:border-l-0 lg:pl-6">
           <PanelList title="Saved" count={saved.length} empty="Save jobs from the graph to keep them here.">
             {saved.map((s) => (
               <li key={s.id} className="group flex items-start gap-2.5">
@@ -222,16 +227,19 @@ export function DashboardShell({ user, role, scope, cities, mine, jobs, links, l
             ))}
           </PanelList>
           {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
-        </aside>
+        </section>
+        </div>
 
-        <div className="pointer-events-none hidden flex-col items-center justify-between lg:sticky lg:top-24 lg:flex lg:h-[calc(100dvh-7.5rem)]">
-          <div className="text-center">
+        <div className="contents">
+          <div className="pointer-events-none hidden text-center lg:fixed lg:inset-x-0 lg:top-[70px] lg:block">
             <h1 className="text-sm font-medium tracking-[0.3em] uppercase">Your skill constellation</h1>
             <p className="mt-2 text-sm text-muted-foreground">
               {scope.kind === "canada" ? "Canada" : scope.city} · {jobs.length} closest jobs · {have.size} skills
             </p>
           </div>
-          <nav aria-label="Focus one category" className="glass pointer-events-auto flex max-w-full items-center gap-0.5 overflow-x-auto rounded-full p-1.5">
+          <div className="hidden lg:block">
+          <LiquidDock>
+          <nav aria-label="Focus one category" className="pointer-events-auto flex max-w-[56vw] items-center gap-0.5 overflow-x-auto">
             {[{ slug: "all", name: "All" }, ...CATEGORIES.filter((c) => [...skills.values()].some((sk) => sk.category === c.slug))].map((c) => {
               const active = c.slug === "all" ? hidden.size === 0 : hidden.size === CATEGORIES.length - 1 && !hidden.has(c.slug);
               return (
@@ -246,10 +254,12 @@ export function DashboardShell({ user, role, scope, cities, mine, jobs, links, l
               );
             })}
           </nav>
+          </LiquidDock>
+          </div>
         </div>
 
         {/* RIGHT: leaderboard / closest jobs, or "overall info" for the selected node */}
-        <aside className="glass glass-in pointer-events-auto flex max-h-[calc(100dvh-7.5rem)] flex-col gap-4 self-start overflow-y-auto p-5 lg:sticky lg:top-24">
+        <aside className="glass glass-in pointer-events-auto flex flex-col gap-4 overflow-y-auto p-5 lg:fixed lg:top-[122px] lg:right-0 lg:bottom-0 lg:w-[clamp(270px,19.8vw,350px)] lg:rounded-none lg:rounded-tl-[40px] lg:border-r-0 lg:border-b-0 lg:pr-6">
           <div className="flex items-center justify-between gap-2">
             {selected ? (
               <button className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground" onClick={() => setSelected(null)}>
@@ -347,11 +357,12 @@ function PanelList({ title, count, empty, children }: { title: string; count: nu
 
 // ---- The glass card that floats beside the selected node ----
 function FloatingCard({ children }: { children: React.ReactNode }) {
-  // The host sits on the node; this shifts the card 64px to its right and draws the line back to the node.
+  // The host sits on the node. .float-wrap shifts the card 64px to one side (globals.css flips it by data-side)
+  // and draws the leader line back to the node.
   return (
-    <div className="relative" style={{ transform: "translate(calc(50% + 64px), 0)" }}>
-      <span aria-hidden className="absolute top-1/2 right-full h-px w-16 bg-gradient-to-r from-white/70 to-white/15" />
-      <span aria-hidden className="absolute top-1/2 right-[calc(100%+64px)] size-1.5 translate-x-1/2 -translate-y-1/2 rounded-full bg-white" />
+    <div className="float-wrap">
+      <span aria-hidden className="float-line" />
+      <span aria-hidden className="float-dot" />
       <div className="glass glass-in w-80 space-y-4 p-5 text-sm text-foreground">{children}</div>
     </div>
   );

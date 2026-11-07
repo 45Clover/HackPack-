@@ -27,6 +27,7 @@
     "cn": "^0.5.2",
     "eslint": "^9",
     "eslint-config-next": "16.4.5",
+    "liquid-glass-react": "^1.1.1",
     "lucide-react": "^1.70.0",
     "postgres": "^4.1.0",
     "react-force-graph-2d": "^1.29.2",

@@ -1,6 +1,7 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
+@source "../node_modules/liquid-glass-react/dist"; /* its markup uses Tailwind classes */
 
 @custom-variant dark (&:is(.dark *));
 
@@ -164,8 +165,8 @@ body::before {
   position: relative;
   isolation: isolate;
   background: linear-gradient(180deg, rgb(30 34 48 / 0.58), rgb(12 14 22 / 0.56));
-  -webkit-backdrop-filter: blur(28px) saturate(1.4);
-  backdrop-filter: blur(28px) saturate(1.4);
+  -webkit-backdrop-filter: blur(20px) saturate(1.4);
+  backdrop-filter: blur(20px) saturate(1.4);
   border: 1px solid rgb(255 255 255 / 0.10);
   border-radius: 1.75rem;
   box-shadow:
@@ -192,17 +193,15 @@ body::before {
 
 /* Labels the 3D graph floats next to nodes. */
 .graph-label {
-  font: 500 11px/1 var(--font-geist-sans), system-ui, sans-serif;
-  color: rgb(236 238 243 / 0.88);
-  padding: 3px 7px;
-  border-radius: 999px;
-  background: rgb(5 7 13 / 0.55);
+  font: 500 10.5px/1 var(--font-geist-sans), system-ui, sans-serif;
+  letter-spacing: 0.02em;
+  color: rgb(236 238 243 / 0.82);
+  text-shadow: 0 1px 8px rgb(5 7 13 / 0.95), 0 0 2px rgb(5 7 13 / 0.9);
   white-space: nowrap;
   pointer-events: none;
-  opacity: 0;
-  transition: opacity 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
-.graph-label[data-show="true"] { opacity: 1; }
+.graph-label[data-kind="job"] { color: rgb(236 238 243 / 0.6); font-size: 10px; }
+.graph-label[data-kind="me"] { letter-spacing: 0.32em; font-size: 10px; color: var(--star); }
 
 }
 
@@ -214,7 +213,6 @@ body::before {
 .glass-in { animation: glass-in 0.45s cubic-bezier(0.16, 1, 0.3, 1); }
 @media (prefers-reduced-motion: reduce) {
   .glass-in { animation: none; }
-  .graph-label { transition: none; }
 }
 
 @layer components {
@@ -227,3 +225,17 @@ body::before {
   color: var(--muted-foreground);
 }
 }
+
+/* The card beside a selected 3D node, with a leader line back to it (moon reference). */
+.float-wrap { position: relative; transform: translate(calc(50% + 64px), 0); }
+.float-line {
+  position: absolute; top: 50%; right: 100%; width: 64px; height: 1px;
+  background: linear-gradient(to right, rgb(255 255 255 / 0.75), rgb(255 255 255 / 0.15));
+}
+.float-dot {
+  position: absolute; top: 50%; right: calc(100% + 64px); width: 6px; height: 6px; border-radius: 999px;
+  background: #fff; transform: translate(50%, -50%);
+}
+[data-side="left"] > .float-wrap { transform: translate(calc(-50% - 64px), 0); }
+[data-side="left"] > .float-wrap > .float-line { right: auto; left: 100%; background: linear-gradient(to left, rgb(255 255 255 / 0.75), rgb(255 255 255 / 0.15)); }
+[data-side="left"] > .float-wrap > .float-dot { right: auto; left: calc(100% + 64px); transform: translate(-50%, -50%); }

@@ -69,7 +69,9 @@ function ringTexture() {
 
 export default function Graph3D({ data, have, learning, hidden, selectedId, onSelect, card, width, height }: Props) {
   const fg = useRef<ForceGraphMethods<GNode, GLink> | undefined>(undefined);
-  const labels = useRef(new Map<string, HTMLDivElement>());
+  const labels = useRef(new Map<string, CSS2DObject>());
+  const sleepTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const settling = useRef(true); // the force layout is still moving
   const reduced = useMemo(() => typeof window !== "undefined" && matchMedia("(prefers-reduced-motion: reduce)").matches, []);
   const css2d = useMemo(() => {
     const r = new CSS2DRenderer();
@@ -97,44 +99,66 @@ export default function Graph3D({ data, have, learning, hidden, selectedId, onSe
   const paintLabels = useCallback(
     (focus: string | null) => {
       const near = focus ? neighbours.get(focus) : null;
-      for (const [id, el] of labels.current) {
+      for (const [id, obj] of labels.current) {
         const degree = neighbours.get(id)?.size ?? 0;
-        const show = id === "me" || id === focus || !!near?.has(id) || (!focus && id.startsWith("s:") && degree >= 4);
-        el.dataset.show = String(show);
+        obj.visible = id === "me" || id === focus || !!near?.has(id) || (!focus && id.startsWith("s:") && degree >= 5);
       }
     },
     [neighbours],
   );
 
-  // Deep space: a few thousand stars on a huge sphere, drifting slowly.
+  // Performance: the scene only redraws while something moves (layout settling, you dragging/zooming, a camera flight).
+  // When it sleeps, the glass panels stop re-blurring a moving canvas every frame, which is what made it lag.
+  const wake = useCallback((ms = 2500) => {
+    const graph = fg.current;
+    if (!graph) return;
+    graph.resumeAnimation();
+    clearTimeout(sleepTimer.current);
+    sleepTimer.current = setTimeout(() => !settling.current && graph.pauseAnimation(), ms);
+  }, []);
+
+  // Deep space: two layers of stars (far + bright) and roomy spacing. Each node carries its own soft halo
+  // (no full-screen bloom: it hazes the background on some GPUs).
   useEffect(() => {
     const graph = fg.current;
     if (!graph) return;
-    const count = 2600;
-    const pos = new Float32Array(count * 3);
-    for (let i = 0; i < count; i++) {
-      const r = 1600 + Math.random() * 1800;
-      const t = Math.random() * Math.PI * 2, p = Math.acos(2 * Math.random() - 1);
-      pos.set([r * Math.sin(p) * Math.cos(t), r * Math.sin(p) * Math.sin(t), r * Math.cos(p)], i * 3);
-    }
-    const geo = new THREE.BufferGeometry();
-    geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
-    const stars = new THREE.Points(geo, new THREE.PointsMaterial({ color: 0xdfe6ff, size: 2.2, sizeAttenuation: true, transparent: true, opacity: 0.75, depthWrite: false }));
-    graph.scene().add(stars);
-    graph.d3Force("charge")?.strength(-140);
-    graph.d3Force("link")?.distance((l: GLink) => (l.kind === "mine" ? 38 : 58));
-    let raf = 0;
-    const drift = () => {
-      stars.rotation.y += 0.00006;
-      raf = requestAnimationFrame(drift);
+    const layer = (count: number, min: number, spread: number, size: number, opacity: number) => {
+      const pos = new Float32Array(count * 3);
+      for (let i = 0; i < count; i++) {
+        const r = min + Math.random() * spread;
+        const t = Math.random() * Math.PI * 2, p = Math.acos(2 * Math.random() - 1);
+        pos.set([r * Math.sin(p) * Math.cos(t), r * Math.sin(p) * Math.sin(t), r * Math.cos(p)], i * 3);
+      }
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+      return new THREE.Points(geo, new THREE.PointsMaterial({ color: 0xdfe6ff, size, sizeAttenuation: true, transparent: true, opacity, depthWrite: false }));
     };
-    if (!reduced) raf = requestAnimationFrame(drift);
+    const far = layer(3200, 2200, 2400, 2.4, 0.55);
+    const near = layer(260, 1400, 900, 4.2, 0.9);
+    graph.scene().add(far, near);
+
+
+    graph.d3Force("charge")?.strength(-340);
+    graph.d3Force("link")?.distance((l: GLink) => (l.kind === "mine" ? 80 : 125));
+
+    graph.renderer().setPixelRatio(Math.min(window.devicePixelRatio, 1.5)); // Retina at 2x = 4x the pixels to draw
+
+    const canvas = graph.renderer().domElement;
+    const onInput = () => wake();
+    for (const type of ["pointerdown", "pointermove", "wheel", "touchstart"]) canvas.addEventListener(type, onInput, { passive: true });
     return () => {
-      cancelAnimationFrame(raf);
-      graph.scene().remove(stars);
-      geo.dispose();
+      for (const type of ["pointerdown", "pointermove", "wheel", "touchstart"]) canvas.removeEventListener(type, onInput);
+      clearTimeout(sleepTimer.current);
+      graph.scene().remove(far, near);
+      far.geometry.dispose();
+      near.geometry.dispose();
     };
-  }, [reduced]);
+  }, [wake]);
+
+  // Anything that changes what's drawn wakes the scene for a moment.
+  useEffect(() => {
+    wake();
+  }, [wake, hidden, have, learning, selectedId]);
 
   // One host element per selection; the card renders into it through a portal.
   const cardHost = useMemo(() => {
@@ -150,7 +174,8 @@ export default function Graph3D({ data, have, learning, hidden, selectedId, onSe
     const graph = fg.current;
     paintLabels(selectedId);
     if (!selectedId) {
-      graph?.zoomToFit(reduced ? 0 : 800, 90); // closing a card pulls back to the whole constellation
+      wake(1400);
+      graph?.zoomToFit(reduced ? 0 : 900, 140); // closing a card pulls back to the whole constellation
       return;
     }
     const node = data.nodes.find((n) => n.id === selectedId);
@@ -160,13 +185,17 @@ export default function Graph3D({ data, have, learning, hidden, selectedId, onSe
     let raf = 0;
     const follow = () => {
       obj.position.set(node.x ?? 0, node.y ?? 0, node.z ?? 0);
+      // Open the card on whichever side has room, so it never slides under the right panel.
+      const { x } = graph.graph2ScreenCoords(node.x ?? 0, node.y ?? 0, node.z ?? 0);
+      cardHost.dataset.side = x > window.innerWidth * 0.55 ? "left" : "right";
       raf = requestAnimationFrame(follow);
     };
     follow();
+    wake(1600); // keep drawing through the camera flight
     const d = Math.hypot(node.x ?? 0, node.y ?? 0, node.z ?? 0);
-    const ratio = d < 1 ? 0 : 1 + 300 / d;
+    const ratio = d < 1 ? 0 : 1 + 340 / d;
     graph.cameraPosition(
-      d < 1 ? { x: 0, y: 0, z: 360 } : { x: (node.x ?? 0) * ratio, y: (node.y ?? 0) * ratio, z: (node.z ?? 0) * ratio },
+      d < 1 ? { x: 0, y: 0, z: 420 } : { x: (node.x ?? 0) * ratio, y: (node.y ?? 0) * ratio, z: (node.z ?? 0) * ratio },
       { x: node.x ?? 0, y: node.y ?? 0, z: node.z ?? 0 },
       reduced ? 0 : 1100,
     );
@@ -176,7 +205,7 @@ export default function Graph3D({ data, have, learning, hidden, selectedId, onSe
     };
     // cardHost changes exactly when the selection does
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cardHost, data]);
+  }, [cardHost, data, wake]);
 
   // Stable, so selecting a node doesn't rebuild every node; it only changes when your skills do.
   const nodeObject = useCallback(
@@ -184,30 +213,38 @@ export default function Graph3D({ data, have, learning, hidden, selectedId, onSe
       const group = new THREE.Group();
       const isHave = n.kind === "skill" && !!n.slug && have.has(n.slug);
       const isLearning = n.kind === "skill" && !!n.slug && learning.has(n.slug);
-      const color = n.kind === "me" ? STAR : n.kind === "job" ? "#e7ebf3" : categoryColor(n.category);
-      const size = n.kind === "me" ? 10 : n.kind === "job" ? 4.2 : 3 + Math.sqrt(neighbours.get(n.id)?.size ?? 1) * 1.1;
+      const color = new THREE.Color(n.kind === "me" ? STAR : n.kind === "job" ? "#dfe5f2" : categoryColor(n.category));
+      const degree = neighbours.get(n.id)?.size ?? 1;
+      const size = n.kind === "me" ? 7 : n.kind === "job" ? 2.6 : 1.8 + Math.sqrt(degree) * 0.7;
 
       if (n.kind === "skill" && !isHave) {
-        // A skill you don't have yet: hollow ring (amber if you've started it).
-        const ring = new THREE.Sprite(new THREE.SpriteMaterial({ map: textures.ring, color: isLearning ? STAR : color, transparent: true, depthWrite: false, opacity: 0.9 }));
-        ring.scale.setScalar(size * 2.4);
+        // A skill you don't have yet: a thin, dim ring (amber once you've started it).
+        const ring = new THREE.Sprite(new THREE.SpriteMaterial({ map: textures.ring, color: isLearning ? new THREE.Color(STAR) : color, transparent: true, depthWrite: false, opacity: isLearning ? 0.95 : 0.55 }));
+        ring.scale.setScalar(size * 3);
         group.add(ring);
+      } else if (n.kind === "job") {
+        const gem = new THREE.Mesh(new THREE.OctahedronGeometry(size), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.9 }));
+        gem.rotation.set(0.4, 0.6, 0);
+        group.add(gem);
       } else {
-        const geo = n.kind === "job" ? new THREE.OctahedronGeometry(size) : new THREE.SphereGeometry(size, 24, 24);
-        group.add(new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color })));
+        group.add(new THREE.Mesh(new THREE.SphereGeometry(size, 16, 16), new THREE.MeshBasicMaterial({ color })));
       }
-      const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: textures.glow, color, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: n.kind === "skill" && !isHave ? 0.35 : 0.85 }));
-      glow.scale.setScalar(size * (n.kind === "me" ? 9 : 6));
-      group.add(glow);
+      // Soft halo: big and warm for you, small for skills you have and for jobs, none for skills you're missing.
+      if (n.kind === "me" || isHave || n.kind === "job") {
+        const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: textures.glow, color, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: n.kind === "me" ? 0.75 : n.kind === "job" ? 0.28 : 0.5 }));
+        halo.scale.setScalar(size * (n.kind === "me" ? 11 : 6));
+        group.add(halo);
+      }
 
-      labels.current.get(n.id)?.remove(); // drop the label from the previous build so it does not linger
+      labels.current.get(n.id)?.element.remove(); // drop the label from the previous build so it does not linger
       const el = document.createElement("div");
       el.className = "graph-label";
-      el.textContent = n.label.length > 44 ? `${n.label.slice(0, 42)}…` : n.label;
+      el.textContent = n.kind === "me" ? "YOU" : n.label.length > 40 ? `${n.label.slice(0, 38)}…` : n.label;
+      el.dataset.kind = n.kind;
       const label = new CSS2DObject(el);
-      label.position.set(0, -size - 6, 0);
+      label.position.set(0, -size - 7, 0);
       group.add(label);
-      labels.current.set(n.id, el);
+      labels.current.set(n.id, label);
       queueMicrotask(() => paintLabels(selectedRef.current));
       return group;
     },
@@ -225,20 +262,25 @@ export default function Graph3D({ data, have, learning, hidden, selectedId, onSe
         showNavInfo={false}
         controlType="orbit"
         extraRenderers={[css2d] as never} // CSS2DRenderer works here; three types and 3d-force-graph types disagree
-        cooldownTicks={140}
+        cooldownTicks={180}
         warmupTicks={30}
-        onEngineStop={() => !selectedId && fg.current?.zoomToFit(900, 90)}
+        onEngineStop={() => {
+          settling.current = false;
+          if (!selectedId) fg.current?.zoomToFit(900, 140);
+          wake(1200); // let the zoom finish, then sleep
+        }}
         nodeVisibility={(n) => n.kind !== "skill" || !hidden.has(n.category ?? "")}
         linkVisibility={(l) => {
           const t = typeof l.target === "string" ? null : l.target;
           return !t || t.kind !== "skill" || !hidden.has(t.category ?? "");
         }}
-        linkColor={(l) => (l.kind === "mine" ? STAR : l.kind === "has" ? "#cfd6e6" : "#59607a")}
-        linkOpacity={0.28}
-        linkWidth={(l) => (l.kind === "mine" ? 0.6 : 0)}
+        linkColor={(l) => (l.kind === "mine" ? STAR : l.kind === "has" ? "#aeb8cf" : "#3b4258")}
+        linkOpacity={0.22}
+        linkWidth={0}
+        linkCurvature={0.22}
         linkDirectionalParticles={(l) => (reduced || l.kind !== "mine" ? 0 : 2)}
-        linkDirectionalParticleWidth={1.4}
-        linkDirectionalParticleSpeed={0.004}
+        linkDirectionalParticleWidth={1.1}
+        linkDirectionalParticleSpeed={0.003}
         linkDirectionalParticleColor={() => STAR}
         onNodeHover={(n) => {
           document.body.style.cursor = n ? "pointer" : "";
