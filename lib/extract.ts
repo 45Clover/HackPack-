@@ -25,7 +25,7 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 export async function extractSkillsBatch(jobs: JobInput[]): Promise<JobSkills[]> {
   if (jobs.length === 0) return [];
   if (jobs.length > MAX_BATCH) throw new Error(`extractSkillsBatch: max ${MAX_BATCH} jobs per call, got ${jobs.length}`);
-  const text = await callGemini(buildExtractInput(jobs));
+  const text = await callGemini(buildExtractInput(jobs), EXTRACT_SYSTEM_PROMPT, EXTRACT_SCHEMA);
   return cleanResults(jobs, JSON.parse(text) as Partial<ExtractResult>);
 }
 
@@ -56,7 +56,9 @@ export function cleanResults(jobs: JobInput[], parsed: Partial<ExtractResult>): 
   return out; // a job missing here was not extracted; /api/extract leaves extracted = false and retries it later
 }
 
-async function callGemini(input: string): Promise<string> {
+// Shared by extract.ts and extras.ts: one throttled Gemini call that must return JSON
+// matching `schema`, with the model fallback on 429.
+export async function callGemini(input: string, systemInstruction: string, schema: unknown): Promise<string> {
   ai ??= new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
   for (const model of MODELS) {
@@ -70,9 +72,9 @@ async function callGemini(input: string): Promise<string> {
         model,
         contents: input,
         config: {
-          systemInstruction: EXTRACT_SYSTEM_PROMPT,
+          systemInstruction,
           responseMimeType: "application/json",
-          responseJsonSchema: EXTRACT_SCHEMA,
+          responseJsonSchema: schema,
           temperature: 0, // same input → same answer, as far as the model allows
         },
       });
