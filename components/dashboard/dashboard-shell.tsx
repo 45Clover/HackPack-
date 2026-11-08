@@ -33,6 +33,7 @@ import { orbitLayout } from "./orbit";
 import { ZoomControl } from "./zoom-control";
 import { CategoryBar } from "./category-bar";
 import { ROLES, roleBySlug } from "@/lib/roles";
+import { openEditProfile } from "@/components/profile/edit-profile";
 
 const Graph3D = dynamic(() => import("./graph-3d"), {
   ssr: false,
@@ -422,7 +423,7 @@ export function DashboardShell({ user, role, scope, cities, mine, jobs, links, l
             ))}
           </PanelList>
 
-          <Link href="/onboarding" className="mt-auto text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline">Edit skills &amp; resume</Link>
+          <button onClick={openEditProfile} className="mt-auto text-left text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline">Edit skills &amp; resume</button>
           {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
         </section>
           {/* One chevron: rides on the card's edge, and stays at the screen edge when the card is tucked away. */}
