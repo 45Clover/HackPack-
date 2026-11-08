@@ -100,7 +100,7 @@ export function MatchView({ jobs, links, have, learning, matchOf, focusId, onHov
         onFocus={() => onHover(id)}
         onBlur={() => onHover(null)}
         aria-pressed={on}
-        aria-label={`${j.title} at ${j.company}: you have ${m.have} of ${m.needed} must-have skills`}
+        aria-label={`${j.internship ? "Internship: " : ""}${j.title} at ${j.company}: you have ${m.have} of ${m.needed} must-have skills`}
         className={`absolute flex -translate-y-1/2 items-center gap-2.5 rounded-xl p-1 ${left ? "flex-row-reverse text-right" : "text-left"}`}
         style={{ top: jobY(i), ...(left ? { right: W - LEFT_X - 18 } : { left: RIGHT_X - 18 }) }}
       >
@@ -109,7 +109,7 @@ export function MatchView({ jobs, links, have, learning, matchOf, focusId, onHov
         </span>
         <span className="flex max-w-[200px] flex-col">
           <span className={`truncate text-[13px] leading-[18px] font-medium ${on ? "text-[var(--blue)]" : ""}`}>{j.title}</span>
-          <span className="truncate text-[11px] leading-4 text-muted-foreground">{j.company} · {p}%</span>
+          <span className="truncate text-[11px] leading-4 text-muted-foreground">{j.internship && "Internship · "}{j.company} · {p}%</span>
         </span>
       </button>
     );

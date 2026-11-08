@@ -32,7 +32,7 @@ import { CompanyLogo, SkillIcon } from "./icons";
 import { orbitLayout } from "./orbit";
 import { ZoomControl } from "./zoom-control";
 import { CategoryBar } from "./category-bar";
-import { ROLES, roleBySlug } from "@/lib/roles";
+import { JOB_TYPES, ROLES, roleBySlug, type JobType } from "@/lib/roles";
 import { openEditProfile } from "@/components/profile/edit-profile";
 
 const Graph3D = dynamic(() => import("./graph-3d"), {
@@ -54,6 +54,7 @@ type Props = {
   user: { name: string; picture: string | null };
   role: string;
   roleSlug?: string; // the role the jobs are ranked for (saved, or ?role= from the filter menu)
+  jobType?: JobType; // internships / full-time / all (?type=, else what they're looking for)
   scope: Scope;
   cities: string[];
   mine: MySkill[];
@@ -71,7 +72,7 @@ type Props = {
   guest?: boolean; // a guest's own map (from the onboarding cookie): show "Save your map"
 };
 
-export function DashboardShell({ user, role, scope, cities, mine, jobs, links, leaders, saved: initialSaved, started, persist, roleSlug, initialFocus, initialSidebarOpen = true, initialView = "map", layout, guest, myRole }: Props) {
+export function DashboardShell({ user, role, scope, cities, mine, jobs, links, leaders, saved: initialSaved, started, persist, roleSlug, jobType = "all", initialFocus, initialSidebarOpen = true, initialView = "map", layout, guest, myRole }: Props) {
   const router = useRouter();
   const skills = useMemo(() => {
     const m = new Map<string, Skill>();
@@ -168,13 +169,14 @@ export function DashboardShell({ user, role, scope, cities, mine, jobs, links, l
   const select = (id: string) => setSelected(data.nodes.find((n) => n.id === id) ?? null);
   // Area + job filters live in the URL. A transition keeps the map up while the new data loads.
   const [filtering, startFiltering] = useTransition();
-  const setFilters = (next: Partial<Scope> & { role?: string }) => {
+  const setFilters = (next: Partial<Scope> & { role?: string; type?: JobType }) => {
     const f = { ...scope, ...next };
     const q = new URLSearchParams({ scope: f.kind, city: f.city });
     if (f.remote) q.set("remote", "1");
     if (f.week) q.set("week", "1");
     const r = next.role ?? roleSlug;
     if (r) q.set("role", r);
+    q.set("type", next.type ?? jobType); // always explicit: "all" must beat a saved "internship"
     startFiltering(() => router.push(`?${q}`, { scroll: false }));
   };
   // Hovering a row lights up its node; keyboard focus does the same.
@@ -275,7 +277,7 @@ export function DashboardShell({ user, role, scope, cities, mine, jobs, links, l
       return (
         <>
           <span className="block truncate font-medium">{j?.title}</span>
-          <span className="block truncate text-muted-foreground">{j?.company}{m && ` · ${m.have}/${m.needed} skills`}</span>
+          <span className="block truncate text-muted-foreground">{j?.internship && "Internship · "}{j?.company}{m && ` · ${m.have}/${m.needed} skills`}</span>
         </>
       );
     }
@@ -552,6 +554,11 @@ export function DashboardShell({ user, role, scope, cities, mine, jobs, links, l
                   </DropdownMenuSub>
                 </DropdownMenuGroup>
                 <DropdownMenuSeparator />
+                <DropdownMenuRadioGroup value={jobType} onValueChange={(t) => setFilters({ type: t as JobType })}>
+                  <DropdownMenuLabel>Job type</DropdownMenuLabel>
+                  {JOB_TYPES.map((t) => <DropdownMenuRadioItem key={t.value} value={t.value}>{t.label}</DropdownMenuRadioItem>)}
+                </DropdownMenuRadioGroup>
+                <DropdownMenuSeparator />
                 <DropdownMenuGroup>
                   <DropdownMenuLabel>Jobs</DropdownMenuLabel>
                   <DropdownMenuCheckboxItem closeOnClick={false} checked={scope.remote} onCheckedChange={(on) => setFilters({ remote: !!on })}>Remote only</DropdownMenuCheckboxItem>
@@ -699,6 +706,7 @@ function JobInfo({ job, links, have, onSkill, isSaved, onSave }: { job: GraphJob
     <div className="space-y-5">
       <div>
         <CompanyLogo name={job.company} className="mb-3 size-10" />
+        {job.internship && <Badge variant="secondary" className="mb-2">Internship</Badge>}
         <h2 className="text-lg font-semibold leading-snug tracking-tight">{job.title}</h2>
         <p className="text-sm text-muted-foreground">{job.company} · {job.remote ? "Remote in Canada" : job.city} · posted {ago(job.posted_at)}</p>
       </div>

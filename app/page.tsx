@@ -4,7 +4,7 @@ import { sql } from "@/lib/db";
 import { getDashboard, getDashboardFor, getProfile, getSavedAndStarted, type MySkill } from "@/lib/dashboard";
 import { readGuest } from "@/lib/guest";
 import { resolveScope } from "@/lib/scope";
-import { roleBySlug, roleFrom } from "@/lib/roles";
+import { jobTypeFrom, roleBySlug, roleFrom } from "@/lib/roles";
 import { DashboardShell } from "@/components/dashboard/dashboard-shell";
 import { Landing } from "@/components/landing/landing";
 
@@ -19,12 +19,14 @@ export default async function Home({ searchParams }: PageProps<"/">) {
     const { scope, cities } = await resolveScope({ city: guest.city ?? undefined, ...sp });
     const mine = await sql<MySkill[]>`select id, slug, name, category from skills where id = any(${guest.skillIds}::int[]) order by name`;
     const roleSlug = roleFrom(sp.role, "any"); // every role by default; the left panel's button narrows to theirs
-    const data = await getDashboardFor([...mine], scope, roleSlug);
+    const jobType = jobTypeFrom(sp.type, guest.lookingFor); // ?type= wins; else what they're looking for
+    const data = await getDashboardFor([...mine], scope, roleSlug, jobType);
     return (
       <DashboardShell
         user={{ name: "Guest", picture: null }}
         role={roleBySlug(roleSlug).name}
         roleSlug={roleSlug ?? undefined}
+        jobType={jobType}
         myRole={guest.role}
         layout={sp.layout === "force" ? "force" : undefined}
         scope={scope}
@@ -48,8 +50,9 @@ export default async function Home({ searchParams }: PageProps<"/">) {
   // Your saved city is the default; the URL switch (?scope=…&city=…) still overrides it.
   const { scope, cities } = await resolveScope({ city: profile.city ?? undefined, ...sp });
   const roleSlug = roleFrom(sp.role, "any"); // every role by default; the left panel's button narrows to your saved role
+  const jobType = jobTypeFrom(sp.type, profile.looking_for); // ?type= wins; else what you're looking for
   const [data, mineLists] = await Promise.all([
-    getDashboard(session.user.sub, scope, roleSlug),
+    getDashboard(session.user.sub, scope, roleSlug, jobType),
     getSavedAndStarted(session.user.sub),
   ]);
 
@@ -58,6 +61,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
       user={{ name: session.user.name ?? "You", picture: session.user.picture ?? null }}
       role={roleBySlug(roleSlug).name}
       roleSlug={roleSlug ?? undefined}
+      jobType={jobType}
       myRole={profile.target_role}
       layout={sp.layout === "force" ? "force" : undefined}
       scope={scope}

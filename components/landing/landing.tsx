@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { ArrowRightIcon, ChevronRightIcon } from "lucide-react";
 import { sql } from "@/lib/db";
-import { getDashboardFor } from "@/lib/dashboard";
+import { getDashboardFor, isInternship } from "@/lib/dashboard";
 import { inScope, resolveScope } from "@/lib/scope";
 import { ago } from "@/lib/ago";
 import { categoryColor } from "@/lib/categories";
@@ -17,7 +17,7 @@ import { Rise } from "./rise";
 import { WaitlistForm } from "@/components/waitlist/waitlist-form";
 
 type SearchParams = Record<string, string | string[] | undefined>;
-type Stats = { jobs: number; week: number; companies: number; skills: number; newest: Date | null; area: number };
+type Stats = { jobs: number; internships: number; companies: number; skills: number; newest: Date | null; area: number };
 
 const cta = buttonVariants({ className: "h-11 gap-2 px-5 text-[15px] active:scale-[0.97]" });
 
@@ -28,7 +28,7 @@ export async function Landing({ searchParams }: { searchParams: SearchParams }) 
     getDashboardFor([], scope, null), // no skills yet: the 15 newest jobs in the area and the skills they ask for
     sql<Stats[]>`
       select count(*)::int as jobs,
-             count(*) filter (where j.posted_at > now() - interval '7 days')::int as week,
+             count(*) filter (where ${isInternship()})::int as internships,
              count(distinct j.company_id)::int as companies,
              (select count(distinct skill_id)::int from job_skills where posted_at > now() - interval '60 days') as skills,
              max(j.posted_at) as newest,
@@ -44,7 +44,7 @@ export async function Landing({ searchParams }: { searchParams: SearchParams }) 
   const fresh = stats.newest ? ago(stats.newest) : "none yet";
   const proof = [
     { value: stats.jobs.toLocaleString("en-CA"), label: "job posts in Canada, last 60 days" },
-    { value: stats.week.toLocaleString("en-CA"), label: "of them posted this week" },
+    { value: stats.internships.toLocaleString("en-CA"), label: "internships and co-ops" },
     { value: stats.companies.toLocaleString("en-CA"), label: "companies hiring" },
     { value: fresh[0].toUpperCase() + fresh.slice(1), label: "newest post" },
   ];
