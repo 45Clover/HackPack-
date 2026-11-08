@@ -1,5 +1,6 @@
 -- Run once in the Neon SQL editor (or: psql "$DATABASE_URL" -f db/schema.sql). Plain Postgres, no extensions.
 -- Owner: Platform (@fabf28). Everyone codes against these tables.
+-- v2.1: added profiles table, if not exists guards, extra indexes.
 
 create table companies (
   id    serial primary key,
@@ -57,9 +58,17 @@ create table stories (                       -- real people, collected at the ev
   consent  boolean not null check (consent)
 );
 
-create table user_skills (
+create table if not exists user_skills (
   user_sub text not null,                    -- Auth0 user id ONLY. No name, no email.
   skill_id int  not null references skills(id),
   status   text not null check (status in ('have','learning')),
   primary key (user_sub, skill_id)
+);
+
+-- v2.1: student profile. Stores sub + preferences only. No name, no email, no resume.
+create table if not exists profiles (
+  user_sub     text primary key,             -- Auth0 sub ONLY
+  target_role  text,
+  city         text,
+  onboarded_at timestamptz not null default now()
 );
