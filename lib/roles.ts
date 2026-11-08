@@ -14,3 +14,5 @@ export const ROLES = [
 ] as const;
 
 export const roleBySlug = (slug: string | null | undefined) => ROLES.find((r) => r.slug === slug) ?? ROLES[0];
+// ?role=… from the URL (the dashboard's role filter), if it's a real role; otherwise the fallback (the saved one).
+export const roleFrom = (v: unknown, fallback: string | null) => (typeof v === "string" && ROLES.some((r) => r.slug === v) ? v : fallback);
