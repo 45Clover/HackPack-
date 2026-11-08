@@ -5,7 +5,7 @@
 //   npx tsx --env-file=.env.local scripts/batches.ts 5 --fetch    ...and call each feed: jobs / Canadian tech jobs
 //   npx tsx --env-file=.env.local scripts/batches.ts keenable 3   the URLs Keenable discovery finds right now (3 searches)
 //
-// No DATABASE_URL in .env.local? It shows the 19 starting boards from db/005_boards.sql instead.
+// No DATABASE_URL in .env.local? It shows the 19 starting boards from db/007_boards.sql instead.
 import { readFileSync } from "node:fs";
 import { feedUrl, fetchBoard, isTech, type Ats, type Board } from "../lib/feeds";
 import { parseLocation } from "../lib/location";
@@ -22,9 +22,9 @@ async function showBatches() {
     boards = await dueBoards(100_000);
     console.log(`From the boards table: ${boards.length} boards due now (not tried in the last 20 h), longest-waiting first.`);
   } else {
-    const seed = readFileSync(new URL("../db/005_boards.sql", import.meta.url), "utf8");
+    const seed = readFileSync(new URL("../db/007_boards.sql", import.meta.url), "utf8");
     boards = [...seed.matchAll(/\('[^']*', '(ashby|greenhouse|lever)', '([^']+)', '\w+'\)/g)].map((m) => ({ ats: m[1] as Ats, board: m[2] }));
-    console.log(`No DATABASE_URL, so this is the starting list in db/005_boards.sql (${boards.length} boards).`);
+    console.log(`No DATABASE_URL, so this is the starting list in db/007_boards.sql (${boards.length} boards).`);
   }
   if (boards.length === 0) { console.log("Nothing due: every active board was fetched in the last 20 h."); return; }
 

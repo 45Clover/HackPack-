@@ -18,7 +18,7 @@ n8n Schedule Trigger (6:00 Alberta time)
 | `trigger-ingest.ts` | Sends the same request from your laptop, to test the endpoint without n8n. |
 | `../schedule.ts` | **The schedule.** How often each discovery source runs. Change it here, not in n8n. |
 | `../daily.ts` | What one call does, and how the 40 s are split. |
-| `../../db/005_boards.sql` | The `boards`, `board_candidates` and `discovery_runs` tables + the 19 starting boards. |
+| `../../db/007_boards.sql` | The `boards`, `board_candidates` and `discovery_runs` tables + the 19 starting boards. |
 
 ## How the server picks what to do
 
@@ -39,7 +39,7 @@ n8n Schedule Trigger (6:00 Alberta time)
 
 ## Set it up
 
-Needs: `INGEST_SECRET` set in Vercel → Settings → Environment Variables, and `db/005_boards.sql` run in Neon.
+Needs: `INGEST_SECRET` set in Vercel → Settings → Environment Variables, and `db/007_boards.sql` run in Neon.
 
 1. **Import.** n8n Cloud → *Create workflow* → **⋯ → Import from File** → pick `lib/n8n/n8n-daily-ingest.json`.
 2. **URL.** Open the **POST /api/ingest** node and replace `REPLACE-WITH-LIVE-URL` with the Vercel URL (or our domain).
