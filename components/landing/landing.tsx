@@ -21,7 +21,8 @@ type Stats = { jobs: number; week: number; companies: number; skills: number; ne
 const cta = buttonVariants({ className: "h-11 gap-2 px-5 text-[15px] active:scale-[0.97]" });
 
 export async function Landing({ searchParams }: { searchParams: SearchParams }) {
-  const { scope, note } = await resolveScope(searchParams);
+  // All of Canada by default; ?city=… or ?scope=city&city=… still picks one city.
+  const { scope, note } = await resolveScope({ scope: searchParams.city ? "city" : "canada", ...searchParams });
   const [map, [stats]] = await Promise.all([
     getDashboardFor([], scope, null), // no skills yet: the 15 newest jobs in the area and the skills they ask for
     sql<Stats[]>`
