@@ -5,7 +5,7 @@ import { buttonVariants } from "@/components/ui/button";
 import { NavMenu, NotificationsMenu, UserMenu } from "@/components/header-menus";
 import { EditProfileDialog } from "@/components/profile/edit-profile";
 
-// Top bar: [menu] HackPack ............ [notifications] [profile]
+// Top bar: [menu] Skilltri ............ [notifications] [profile]
 export async function SiteHeader() {
   const session = authReady ? await auth0.getSession() : null;
   const notifications = session
@@ -16,7 +16,7 @@ export async function SiteHeader() {
     <header className="fixed inset-x-2 top-0 z-30 lg:inset-x-[11vw]">
       <nav className="surface flex h-[52px] items-center gap-2 rounded-t-none rounded-b-[22px] px-3">
         <NavMenu signedIn={!!session} />
-        <Link href="/" className="text-[15px] font-semibold tracking-tight">HackPack</Link>
+        <Link href="/" className="text-[15px] font-semibold tracking-tight">Skilltri</Link>
         <div className="ml-auto flex items-center gap-1">
           {session ? (
             <>
