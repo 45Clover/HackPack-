@@ -20,7 +20,7 @@ test("the prompt's example only uses allowed values", () => {
 });
 
 test("input is trimmed JSON with only id, title, description", () => {
-  const input = JSON.parse(buildExtractInput([{ id: "x", title: "Dev", description: "a".repeat(10_000) }]));
+  const input = JSON.parse(buildExtractInput([{ id: "x", title: "Dev", description: "a".repeat(20_000) }]));
   assert.deepEqual(Object.keys(input[0]), ["id", "title", "description"]);
-  assert.equal(input[0].description.length, 4000);
+  assert.equal(input[0].description.length, 12000);
 });
