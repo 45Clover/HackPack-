@@ -28,6 +28,10 @@ Prompt 2: in-demand skills and meaningful networks in a changing job market.
 
 <br>
 
+## Live, with real users
+
+Skilltrii is a full working product, not a mockup. It's live at **[skilltrii.work](https://www.skilltrii.work)**, new jobs come in every morning, and **22 people have already signed up** and saved their skill maps.
+
 ## The problem
 
 We're international students looking for tech work in Canada, and the market is tight.
@@ -86,11 +90,11 @@ flowchart LR
 
 <div align="center">
 
-| 2,171 | 374 | 247 | 4,364 | 36 / 36 |
-|:---:|:---:|:---:|:---:|:---:|
-| Canadian tech jobs | companies hiring | skills on the map | job boards found by discovery | unit tests passing |
+| 2,335 | 407 | 347 | 22 | 4,364 | 36 / 36 |
+|:---:|:---:|:---:|:---:|:---:|:---:|
+| Canadian tech jobs | companies hiring | skills on the map | people signed up | job boards found by discovery | unit tests passing |
 
-<sub>Live from the database on 8 Nov 2026.</sub>
+<sub>Live from the database at 10 AM MT, 8 Nov 2026.</sub>
 
 </div>
 
@@ -102,6 +106,15 @@ flowchart LR
 - **"Delete my data"** removes everything we hold about you, in one click.
 - **Real data only.** Every job links back to the employer's own post. Every number in an Impact project is copied from the public series it cites.
 - **AI is labelled** wherever it shows up in the app.
+
+## What's next
+
+The product works end to end. Next, we make it work for everyone:
+
+1. **Accessibility.** A full WCAG 2.2 AA pass: keyboard and screen-reader testing on every page, a text version of the 3D map, and contrast checks on every colour.
+2. **Every post read.** Gemini finishes reading the whole backlog, so every job gets a match score.
+3. **Internships.** More internship and co-op sources, since so few of today's posts are junior.
+4. **Career centres.** Bring Skilltrii to campus career centres and newcomer agencies.
 
 ## Tech stack
 
