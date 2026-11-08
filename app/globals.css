@@ -218,3 +218,27 @@ body { overflow-x: clip; }
 
 /* Small cards on the neighbours of the selected node: they sit just above their node. */
 .mini-wrap { transform: translate(0, calc(-50% - 22px)); }
+
+/* The Learning guide drawer pushes the page back while it's open (skill-drawer.tsx sets data-drawer on <html>).
+   CSS, not GSAP: transform transitions run on the compositor, so they stay smooth while React mounts the guide. */
+#app-shell {
+  transform-origin: 50% 0;
+  /* coming back: as fast as the drawer drops away */
+  transition: transform 250ms cubic-bezier(0.32, 0.72, 0, 1), border-radius 250ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+html[data-drawer] body { background-color: var(--ink); }
+html[data-drawer] #app-shell { overflow: clip; }
+html[data-drawer="push"] #app-shell {
+  transform: translateY(10px) scale(0.94);
+  border-radius: 28px;
+  transition-duration: 400ms;
+}
+
+/* Hairline figures on the white cards (landing "How it works"): warm ink, plates the colour of the card. */
+.hairline-warm {
+  --hairline-plate: #fff;
+  --hairline-hi: var(--ink);
+  --hairline-edge: #6f6b63;
+  --hairline-mid: #a19c92;
+  --hairline-lo: #d6d2c8;
+}

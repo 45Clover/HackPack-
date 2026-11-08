@@ -57,6 +57,7 @@ export function HeroMap({ jobs, links }: { jobs: GraphJob[]; links: GraphLink[] 
             hidden={none}
             selectedId={null}
             onSelect={(n) => n?.slug && router.push(`/skills/${n.slug}`)}
+            onHover={(n) => n?.slug && router.prefetch(`/skills/${n.slug}`)} // the drawer opens on click
             hoverId={null}
             mini={() => null}
             width={size.width}
