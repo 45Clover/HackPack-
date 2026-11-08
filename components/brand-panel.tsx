@@ -1,4 +1,4 @@
-// The left half of the 50/50 auth screens (onboarding, login): black panel, the HackPack name, the map's shapes
+// The left half of the 50/50 auth screens (onboarding, login): black panel, the Skilltri name, the map's shapes
 // drawn flat, and a headline. Hidden on phones, where the right half is the whole screen.
 // `children` swaps the flat drawing for a live one (onboarding draws your answers there).
 import { categoryColor } from "@/lib/categories";
@@ -6,7 +6,7 @@ import { categoryColor } from "@/lib/categories";
 export function BrandPanel({ title, note, children }: { title: string; note?: string; children?: React.ReactNode }) {
   return (
     <aside className="relative hidden flex-col overflow-hidden bg-[var(--ink)] p-10 text-[#f4f3ef] md:flex">
-      <span className="relative z-10 text-[15px] font-semibold tracking-tight">HackPack</span>
+      <span className="relative z-10 text-[15px] font-semibold tracking-tight">Skilltri</span>
       {children ?? <Constellation />}
       <div className="relative z-10 mt-auto max-w-md">
         <p className="text-4xl font-semibold leading-[1.1] tracking-tight">{title}</p>
