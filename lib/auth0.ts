@@ -1,7 +1,8 @@
-// STUB. Owner: Platform + auth (@fabf28). Replace with the real Auth0Client from the tutorial (T6),
-// and add proxy.ts. The UI only calls auth0.getSession(), which keeps the same shape.
-export const auth0 = {
-  async getSession(): Promise<{ user: { sub: string; name?: string; picture?: string } } | null> {
-    return null;
-  },
-};
+import { Auth0Client } from "@auth0/nextjs-auth0/server";
+
+// Reads AUTH0_DOMAIN, AUTH0_CLIENT_ID, AUTH0_CLIENT_SECRET, AUTH0_SECRET and APP_BASE_URL from the environment
+// on the first request, so builds work before the keys exist.
+export const auth0 = new Auth0Client();
+
+// False until the Auth0 keys are in .env.local. Lets teammates run the app (and /preview) without them.
+export const authReady = Boolean(process.env.AUTH0_DOMAIN);

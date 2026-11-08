@@ -22,7 +22,7 @@ export function SkillGraph({ edges }: { edges: Edge[] }) {
   if (edges.length === 0) return null;
   // aria-hidden: the table below holds the same data in an accessible form.
   return (
-    <div aria-hidden="true" className="overflow-hidden rounded-lg border">
+    <div aria-hidden="true" className="surface overflow-hidden">
       <ForceGraph2D
         graphData={data}
         height={520}
@@ -36,10 +36,10 @@ export function SkillGraph({ edges }: { edges: Edge[] }) {
           const r = node.kind === "skill" ? 5 : 8;
           ctx.beginPath();
           ctx.arc(node.x ?? 0, node.y ?? 0, r, 0, 2 * Math.PI);
-          ctx.fillStyle = node.kind === "skill" ? "#2563eb" : "#d97706";
+          ctx.fillStyle = node.kind === "skill" ? "#2f5bea" : "#1f1f1d";
           ctx.fill();
           ctx.font = `${12 / scale}px sans-serif`;
-          ctx.fillStyle = "#111827";
+          ctx.fillStyle = "#2a2a28";
           ctx.fillText(node.label, (node.x ?? 0) + r + 2, (node.y ?? 0) + 4);
         }}
       />
