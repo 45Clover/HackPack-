@@ -46,6 +46,7 @@ type Props = {
   width: number;
   height: number;
   autoRotate?: boolean; // the landing page: turn slowly on its own, and stay awake while turning
+  refit?: boolean; // /explore: the jobs change with its filters, so frame the map again once each new layout settles
 };
 
 const BLUE = "#2f5bea";
@@ -69,7 +70,7 @@ const MIN_D = 90, MAX_D = 1250;
 const distanceToZoom = (d: number) => Math.min(100, Math.max(0, (100 * Math.log(MAX_D / d)) / Math.log(MAX_D / MIN_D)));
 const zoomToDistance = (v: number) => MAX_D * Math.pow(MIN_D / MAX_D, v / 100);
 
-export default function Graph3D({ zoom, onZoom, orbit, data, have, learning, hidden, selectedId, onSelect, onHover, hoverId, mini, width, height, autoRotate }: Props) {
+export default function Graph3D({ zoom, onZoom, orbit, data, have, learning, hidden, selectedId, onSelect, onHover, hoverId, mini, width, height, autoRotate, refit }: Props) {
   const fg = useRef<ForceGraphMethods<GNode, GLink> | undefined>(undefined);
   const labels = useRef(new Map<string, CSS2DObject>());
   const groups = useRef(new Map<string, THREE.Group>());
@@ -164,9 +165,17 @@ export default function Graph3D({ zoom, onZoom, orbit, data, have, learning, hid
       const hHalf = Math.atan(Math.tan(vHalf) * camera.aspect);
       const center = new THREE.Vector3((box.x[0] + box.x[1]) / 2, (box.y[0] + box.y[1]) / 2, (box.z[0] + box.z[1]) / 2);
       let distance = 0;
-      for (const x of box.x) for (const y of box.y) for (const z of box.z) {
-        const c = new THREE.Vector3(x, y, z).sub(center);
-        distance = Math.max(distance, Math.max(Math.abs(c.dot(up)) / Math.tan(vHalf), Math.abs(c.dot(right)) / Math.tan(hHalf)) - c.dot(fwd));
+      if (autoRotate) {
+        // Turning on its own (round the vertical axis): any side of the box can face the camera, so fit its full
+        // height, its widest turn (the x-z diagonal), and step back by that half-width for the corner nearest to us.
+        const halfH = (box.y[1] - box.y[0]) / 2;
+        const halfW = Math.hypot(box.x[1] - box.x[0], box.z[1] - box.z[0]) / 2;
+        distance = Math.max(halfH / Math.tan(vHalf), halfW / Math.tan(hHalf)) + halfW;
+      } else {
+        for (const x of box.x) for (const y of box.y) for (const z of box.z) {
+          const c = new THREE.Vector3(x, y, z).sub(center);
+          distance = Math.max(distance, Math.max(Math.abs(c.dot(up)) / Math.tan(vHalf), Math.abs(c.dot(right)) / Math.tan(hHalf)) - c.dot(fwd));
+        }
       }
       const from = { pos: camera.position.clone(), look: target.clone() };
       const to = { pos: center.clone().addScaledVector(fwd, -distance), look: center };
@@ -181,7 +190,7 @@ export default function Graph3D({ zoom, onZoom, orbit, data, have, learning, hid
         onComplete: reportZoom,
       });
     },
-    [height, reduced, wake, reportZoom],
+    [height, reduced, wake, reportZoom, autoRotate],
   );
 
   // The slider moved: slide the camera along its line of sight to the matching distance.
@@ -262,6 +271,9 @@ export default function Graph3D({ zoom, onZoom, orbit, data, have, learning, hid
     controls.minDistance = MIN_D;
 
     graph.d3Force("charge")?.strength(-340);
+    // Showcase maps (landing, /explore) can hold jobs that share no skill with the rest; unlimited repulsion pushes
+    // them so far out that the fit needs more distance than MAX_D allows and the map gets cropped. Cap the reach.
+    if (autoRotate) graph.d3Force("charge")?.distanceMax(420);
     graph.d3Force("link")?.distance((l: GLink) => (l.kind === "mine" ? 80 : 125));
 
     graph.renderer().setPixelRatio(Math.min(window.devicePixelRatio, 1.5)); // Retina at 2x = 4x the pixels to draw
@@ -278,7 +290,7 @@ export default function Graph3D({ zoom, onZoom, orbit, data, have, learning, hid
       graph.scene().remove(backdrop.group);
       backdrop.dispose();
     };
-  }, [wake, reportZoom]);
+  }, [wake, reportZoom, autoRotate]); // autoRotate never changes for a mounted map
 
   // Anything that changes what's drawn wakes the scene for a moment.
   useEffect(() => {
@@ -290,6 +302,7 @@ export default function Graph3D({ zoom, onZoom, orbit, data, have, learning, hid
   // force-graph restart its engine each time; each restart "finished" by re-fitting the camera, whose zoom report
   // re-rendered the dashboard: a loop that kept the map busy and slow to answer the cursor.
   const fitted = useRef(false); // the first time the layout settles, fit the camera; later stops don't move it
+  useEffect(() => { if (refit) fitted.current = false; }, [data, refit]); // new jobs: fit again when they settle
   const onEngineStop = useCallback(() => {
     settling.current = false;
     if (fitted.current || selectedRef.current) return;

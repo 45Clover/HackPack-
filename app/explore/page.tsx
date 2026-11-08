@@ -27,16 +27,20 @@ export default async function Explore() {
   const companies = new Set(jobs.map((j) => j.company)).size;
 
   return (
-    <main className="mx-auto flex w-full max-w-[1000px] flex-col gap-10 pt-6 pb-10">
-      <header className="flex max-w-2xl flex-col gap-3">
-        <h1 className="text-[40px] leading-[1.04] font-semibold tracking-[-0.03em] text-balance lg:text-5xl">Every job we&apos;ve mapped</h1>
-        <p className="text-[17px] leading-relaxed text-muted-foreground">
-          {jobs.length} real job posts from {companies} companies across Canada, each with the skills it asks for. These are the jobs
-          the map is drawn from. Open a skill to see who&apos;s hiring for it and where to learn it for free.
-          {!session && <> <Link href="/onboarding" className="text-foreground underline underline-offset-4">See your own map</Link> to find the ones you&apos;re closest to.</>}
-        </p>
-      </header>
-      <JobList jobs={[...jobs]} />
+    <main className="mx-auto flex w-full max-w-[1000px] flex-col gap-10 pb-10">
+      <JobList
+        jobs={[...jobs]}
+        intro={
+          <header className="flex max-w-2xl flex-col gap-3">
+            <h1 className="text-[40px] leading-[1.04] font-semibold tracking-[-0.03em] text-balance lg:text-5xl">Every job we&apos;ve mapped</h1>
+            <p className="text-[17px] leading-relaxed text-muted-foreground">
+              {jobs.length} real job posts from {companies} companies across Canada, each with the skills it asks for. These are the jobs
+              the map is drawn from. Open a skill to see who&apos;s hiring for it and where to learn it for free.
+              {!session && <> <Link href="/onboarding" className="text-foreground underline underline-offset-4">See your own map</Link> to find the ones you&apos;re closest to.</>}
+            </p>
+          </header>
+        }
+      />
     </main>
   );
 }
