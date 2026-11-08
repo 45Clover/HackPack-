@@ -1,8 +1,8 @@
 "use client";
 // Pre-registration: your email, who you are, and whether to hear about internships. Posts to /api/waitlist (db/010).
-// On the landing page and /waitlist (the QR code at judging); `source` says which one.
+// On the landing page, /waitlist (the QR code at judging) and /joinearly; `source` says which one.
 import { useId, useState } from "react";
-import { WAITLIST_ROLES } from "@/lib/waitlist";
+import { WAITLIST_ROLES, type Source } from "@/lib/waitlist";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 
 const field = "h-11 rounded-xl px-3.5 text-[15px] md:text-[15px]";
 
-export function WaitlistForm({ source }: { source: "landing" | "waitlist" }) {
+export function WaitlistForm({ source }: { source: Source }) {
   const id = useId();
   const [role, setRole] = useState<string | null>(null);
   const [internships, setInternships] = useState(false);

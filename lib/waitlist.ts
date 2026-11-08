@@ -7,7 +7,10 @@ export const WAITLIST_ROLES = [
   { value: "employer", label: "Employer" },
 ];
 
-export type WaitlistEntry = { email: string; role: string; internships: boolean; source: "landing" | "waitlist" };
+// Where they joined: the landing section, /waitlist (the QR code at judging) or /joinearly.
+export const SOURCES = ["landing", "waitlist", "joinearly"] as const;
+export type Source = (typeof SOURCES)[number];
+export type WaitlistEntry = { email: string; role: string; internships: boolean; source: Source };
 
 // something@something.tld with no spaces. The real check is the launch email arriving.
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -17,7 +20,7 @@ export function parseWaitlist(body: unknown): WaitlistEntry | null {
   const email = typeof b.email === "string" ? b.email.trim().toLowerCase() : "";
   if (email.length > 254 || !EMAIL.test(email)) return null;
   if (!WAITLIST_ROLES.some((r) => r.value === b.role)) return null;
-  return { email, role: b.role as string, internships: b.internships === true, source: b.source === "waitlist" ? "waitlist" : "landing" };
+  return { email, role: b.role as string, internships: b.internships === true, source: SOURCES.includes(b.source as Source) ? (b.source as Source) : "landing" };
 }
 
 // The hidden `company` field: people never see it, form-filling bots fill it in.
