@@ -2,10 +2,11 @@ import Link from "next/link";
 import { auth0, authReady } from "@/lib/auth0";
 import { getNotifications, getProfile } from "@/lib/dashboard";
 import { buttonVariants } from "@/components/ui/button";
+import { LogoMark } from "@/components/logo-mark";
 import { NavMenu, NotificationsMenu, UserMenu } from "@/components/header-menus";
 import { EditProfileDialog } from "@/components/profile/edit-profile";
 
-// Top bar: [menu] Skilltrii ............ [notifications] [profile]
+// Top bar: [menu] [mark] Skilltrii ............ [notifications] [profile]
 export async function SiteHeader() {
   const session = authReady ? await auth0.getSession() : null;
   const notifications = session
@@ -16,7 +17,10 @@ export async function SiteHeader() {
     <header className="fixed inset-x-2 top-0 z-30 lg:inset-x-[11vw]">
       <nav className="surface flex h-[52px] items-center gap-2 rounded-t-none rounded-b-[22px] px-3">
         <NavMenu signedIn={!!session} />
-        <Link href="/" className="text-[15px] font-semibold tracking-tight">Skilltrii</Link>
+        <Link href="/" className="flex items-center gap-2 text-[15px] font-semibold tracking-tight">
+          <LogoMark className="size-6" />
+          Skilltrii
+        </Link>
         <div className="ml-auto flex items-center gap-1">
           {session ? (
             <>
