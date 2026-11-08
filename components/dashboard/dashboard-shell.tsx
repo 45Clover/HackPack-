@@ -31,6 +31,8 @@ import { MatchView } from "./match-view";
 import { CompanyLogo, SkillIcon } from "./icons";
 import { orbitLayout } from "./orbit";
 import { ZoomControl } from "./zoom-control";
+import { CategoryBar } from "./category-bar";
+import { ROLES, roleBySlug } from "@/lib/roles";
 
 const Graph3D = dynamic(() => import("./graph-3d"), {
   ssr: false,
@@ -50,6 +52,7 @@ const onResize = (cb: () => void) => {
 type Props = {
   user: { name: string; picture: string | null };
   role: string;
+  roleSlug?: string; // the role the jobs are ranked for (saved, or ?role= from the filter menu)
   scope: Scope;
   cities: string[];
   mine: MySkill[];
@@ -66,7 +69,7 @@ type Props = {
   guest?: boolean; // a guest's own map (from the onboarding cookie): show "Save your map"
 };
 
-export function DashboardShell({ user, role, scope, cities, mine, jobs, links, leaders, saved: initialSaved, started, persist, initialFocus, initialSidebarOpen = true, initialView = "map", layout, guest }: Props) {
+export function DashboardShell({ user, role, scope, cities, mine, jobs, links, leaders, saved: initialSaved, started, persist, roleSlug, initialFocus, initialSidebarOpen = true, initialView = "map", layout, guest }: Props) {
   const router = useRouter();
   const skills = useMemo(() => {
     const m = new Map<string, Skill>();
@@ -161,11 +164,13 @@ export function DashboardShell({ user, role, scope, cities, mine, jobs, links, l
   const select = (id: string) => setSelected(data.nodes.find((n) => n.id === id) ?? null);
   // Area + job filters live in the URL. A transition keeps the map up while the new data loads.
   const [filtering, startFiltering] = useTransition();
-  const setFilters = (next: Partial<Scope>) => {
+  const setFilters = (next: Partial<Scope> & { role?: string }) => {
     const f = { ...scope, ...next };
     const q = new URLSearchParams({ scope: f.kind, city: f.city });
     if (f.remote) q.set("remote", "1");
     if (f.week) q.set("week", "1");
+    const r = next.role ?? roleSlug;
+    if (r) q.set("role", r);
     startFiltering(() => router.push(`?${q}`, { scroll: false }));
   };
   // Hovering a row lights up its node; keyboard focus does the same.
@@ -472,21 +477,12 @@ export function DashboardShell({ user, role, scope, cities, mine, jobs, links, l
                 </button>
               ))}
             </div>
-          <nav ref={categoryBar} inert={view === "match"} data-enter="bottom" aria-label="Focus one category" className="enter surface pointer-events-auto hidden max-w-[calc(100vw-clamp(250px,18.6vw,330px)-clamp(270px,19.8vw,350px)-48px)] items-center gap-0.5 overflow-x-auto rounded-full p-1.5 [scrollbar-width:none] lg:fixed lg:bottom-5 lg:left-1/2 lg:flex lg:-translate-x-1/2">
-            {[{ slug: "all", name: "All" }, ...CATEGORIES.filter((c) => [...skills.values()].some((sk) => sk.category === c.slug))].map((c) => {
-              const active = c.slug === "all" ? hidden.size === 0 : hidden.size === CATEGORIES.length - 1 && !hidden.has(c.slug);
-              return (
-                <button
-                  key={c.slug}
-                  aria-pressed={active}
-                  onClick={() => setHidden(c.slug === "all" ? new Set() : new Set(CATEGORIES.filter((x) => x.slug !== c.slug).map((x) => x.slug)))}
-                  className={`flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1.5 text-[12.5px] transition-colors ${active ? "bg-[var(--ink)] text-white" : "text-muted-foreground hover:bg-secondary hover:text-foreground"}`}
-                >
-                  {c.slug !== "all" && <span aria-hidden className="size-2 rounded-full" style={{ background: "color" in c ? c.color : undefined }} />}
-                  {c.name}
-                </button>
-              );
-            })}
+          <nav ref={categoryBar} inert={view === "match"} data-enter="bottom" aria-label="Focus one category" className="enter surface pointer-events-auto hidden max-w-[calc(100vw-clamp(250px,18.6vw,330px)-clamp(270px,19.8vw,350px)-48px)] items-center gap-0.5 rounded-full p-1.5 lg:fixed lg:bottom-5 lg:left-1/2 lg:flex lg:-translate-x-1/2">
+            <CategoryBar
+              cats={[{ slug: "all", label: "All" }, ...CATEGORIES.filter((c) => [...skills.values()].some((sk) => sk.category === c.slug)).map((c) => ({ slug: c.slug, label: c.short, color: c.color }))]}
+              active={hidden.size === 0 ? "all" : hidden.size === CATEGORIES.length - 1 ? CATEGORIES.find((c) => !hidden.has(c.slug))?.slug ?? null : null}
+              onPick={(slug) => setHidden(slug === "all" ? new Set() : new Set(CATEGORIES.filter((x) => x.slug !== slug).map((x) => x.slug)))}
+            />
           </nav>
         </div>
 
@@ -506,7 +502,7 @@ export function DashboardShell({ user, role, scope, cities, mine, jobs, links, l
               </div>
             )}
             <DropdownMenu>
-              <DropdownMenuTrigger className={buttonVariants({ variant: "ghost", size: "icon" })} aria-label="Filter: area and jobs">
+              <DropdownMenuTrigger className={buttonVariants({ variant: "ghost", size: "icon" })} aria-label="Filter: area, role and jobs">
                 <SlidersHorizontalIcon />
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-60">
@@ -526,6 +522,18 @@ export function DashboardShell({ user, role, scope, cities, mine, jobs, links, l
                     </DropdownMenuSubContent>
                   </DropdownMenuSub>
                 )}
+                <DropdownMenuSeparator />
+                <DropdownMenuGroup>
+                  <DropdownMenuLabel>Role</DropdownMenuLabel>
+                  <DropdownMenuSub>
+                    <DropdownMenuSubTrigger>{roleBySlug(roleSlug).name}</DropdownMenuSubTrigger>
+                    <DropdownMenuSubContent className="max-h-80 overflow-y-auto">
+                      <DropdownMenuRadioGroup value={roleSlug ?? "any"} onValueChange={(r) => setFilters({ role: String(r) })}>
+                        {ROLES.map((r) => <DropdownMenuRadioItem key={r.slug} value={r.slug}>{r.name}</DropdownMenuRadioItem>)}
+                      </DropdownMenuRadioGroup>
+                    </DropdownMenuSubContent>
+                  </DropdownMenuSub>
+                </DropdownMenuGroup>
                 <DropdownMenuSeparator />
                 <DropdownMenuGroup>
                   <DropdownMenuLabel>Jobs</DropdownMenuLabel>

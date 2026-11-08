@@ -205,6 +205,18 @@ export default function Graph3D({ zoom, onZoom, orbit, data, have, learning, hid
     };
   }, [autoRotate, reduced]);
 
+  // New data (area, role or filters changed): drop the labels of nodes that left the map. Their DOM elements live
+  // outside the scene, so removing a node's 3D object alone leaves its title floating on the new map.
+  useEffect(() => {
+    const ids = new Set(data.nodes.map((n) => n.id));
+    for (const [id, obj] of labels.current) {
+      if (ids.has(id)) continue;
+      obj.element.remove();
+      labels.current.delete(id);
+      groups.current.delete(id);
+    }
+  }, [data]);
+
   // Orbit layout: a faint ring through the skills, so the donut reads as an orbit.
   useEffect(() => {
     const graph = fg.current;

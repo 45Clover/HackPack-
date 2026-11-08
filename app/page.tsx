@@ -4,7 +4,7 @@ import { sql } from "@/lib/db";
 import { getDashboard, getDashboardFor, getProfile, getSavedAndStarted, type MySkill } from "@/lib/dashboard";
 import { readGuest } from "@/lib/guest";
 import { resolveScope } from "@/lib/scope";
-import { roleBySlug } from "@/lib/roles";
+import { roleBySlug, roleFrom } from "@/lib/roles";
 import { DashboardShell } from "@/components/dashboard/dashboard-shell";
 import { Landing } from "@/components/landing/landing";
 
@@ -18,11 +18,13 @@ export default async function Home({ searchParams }: PageProps<"/">) {
   if (guest) {
     const { scope, cities } = await resolveScope({ city: guest.city ?? undefined, ...sp });
     const mine = await sql<MySkill[]>`select id, slug, name, category from skills where id = any(${guest.skillIds}::int[]) order by name`;
-    const data = await getDashboardFor([...mine], scope, guest.role);
+    const roleSlug = roleFrom(sp.role, guest.role); // the filter menu can look at another role
+    const data = await getDashboardFor([...mine], scope, roleSlug);
     return (
       <DashboardShell
         user={{ name: "Guest", picture: null }}
-        role={roleBySlug(guest.role).name}
+        role={roleBySlug(roleSlug).name}
+        roleSlug={roleSlug ?? undefined}
         scope={scope}
         cities={cities}
         mine={data.mine}
@@ -43,15 +45,17 @@ export default async function Home({ searchParams }: PageProps<"/">) {
 
   // Your saved city is the default; the URL switch (?scope=…&city=…) still overrides it.
   const { scope, cities } = await resolveScope({ city: profile.city ?? undefined, ...sp });
+  const roleSlug = roleFrom(sp.role, profile.target_role); // ?role= from the filter menu; your saved role stays saved
   const [data, mineLists] = await Promise.all([
-    getDashboard(session.user.sub, scope, profile.target_role),
+    getDashboard(session.user.sub, scope, roleSlug),
     getSavedAndStarted(session.user.sub),
   ]);
 
   return (
     <DashboardShell
       user={{ name: session.user.name ?? "You", picture: session.user.picture ?? null }}
-      role={roleBySlug(profile.target_role).name}
+      role={roleBySlug(roleSlug).name}
+      roleSlug={roleSlug ?? undefined}
       scope={scope}
       cities={cities}
       mine={data.mine}
