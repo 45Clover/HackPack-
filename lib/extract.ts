@@ -68,11 +68,12 @@ export function cleanResults(jobs: JobInput[], parsed: Partial<ExtractResult>): 
 export type GeminiOptions = { timeoutMs?: number };
 
 // Should we move on to the next model? Yes for: quota used up (429), overloaded (503),
-// or our own time limit ran out. Anything else (bad key, bad request) is a real error.
+// Google ran past our deadline (504 DEADLINE_EXCEEDED, seen live on Vercel), or our own
+// time limit ran out. Anything else (bad key, bad request) is a real error.
 export function shouldTryNextModel(err: unknown): boolean {
   const e = err as { status?: number; name?: string; message?: string };
-  if (e.status === 429 || e.status === 503) return true;
-  return e.name === "AbortError" || e.name === "TimeoutError" || /timed? ?out|abort/i.test(e.message ?? "");
+  if (e.status === 429 || e.status === 503 || e.status === 504) return true;
+  return e.name === "AbortError" || e.name === "TimeoutError" || /timed? ?out|abort|deadline/i.test(e.message ?? "");
 }
 
 // Shared by extract.ts and extras.ts: one throttled Gemini call that must return JSON

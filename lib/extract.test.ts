@@ -61,3 +61,8 @@ test("falls back to the next model on quota, overload or timeout, not on real er
   assert.equal(shouldTryNextModel({ status: 400, message: "bad request" }), false);
   assert.equal(shouldTryNextModel({ status: 403, message: "API key invalid" }), false);
 });
+
+test("falls back when Google's deadline expires (504), as seen live on Vercel", () => {
+  assert.equal(shouldTryNextModel({ status: 504 }), true);
+  assert.equal(shouldTryNextModel(new Error('{"error":{"code":504,"message":"Deadline expired before operation could complete.","status":"DEADLINE_EXCEEDED"}}')), true);
+});
