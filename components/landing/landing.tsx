@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { HeroMap } from "./hero-map";
 import { HeroShader } from "./hero-shader";
+import { SmoothScroll } from "./smooth-scroll";
 import { Rise } from "./rise";
 
 type SearchParams = Record<string, string | string[] | undefined>;
@@ -46,9 +47,10 @@ export async function Landing({ searchParams }: { searchParams: SearchParams }) 
   ];
 
   return (
-    <Rise className="mx-auto flex w-full max-w-[1200px] flex-col gap-20 pt-6 pb-10 lg:gap-28 lg:pt-10">
+    <Rise className="mx-auto flex w-full max-w-[1200px] flex-col gap-20 pb-10 lg:gap-28">
+      <SmoothScroll />
       {/* 1. Hero: the promise on the left, the real map turning on the right, over a slow shader gradient. */}
-      <section className="relative isolate grid items-center gap-8 overflow-hidden rounded-[2.5rem] px-6 py-10 sm:px-10 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-12 lg:px-12 lg:py-14">
+      <section className="relative isolate grid min-h-[calc(100svh-72px)] items-center gap-8 py-10 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-12 lg:py-12">
         <HeroShader />
         <div className="flex min-w-0 flex-col items-start gap-6">
           <Badge data-reveal variant="outline" className="h-auto min-h-7 gap-2 bg-white px-3 py-1 text-left text-[13px] font-normal whitespace-normal text-muted-foreground">
@@ -75,7 +77,7 @@ export async function Landing({ searchParams }: { searchParams: SearchParams }) 
 
         {/* Phones: job titles would pile up, so only skill names show; the caption sits under the map. */}
         <figure data-reveal className="relative flex flex-col gap-3 max-lg:[&_.graph-label[data-kind=job]]:hidden">
-          <div className="h-[380px] sm:h-[460px] lg:h-[min(620px,calc(100svh-140px))]">
+          <div className="h-[380px] sm:h-[460px] lg:h-[min(760px,calc(100svh-150px))]">
             <HeroMap jobs={map.jobs} links={map.links} />
           </div>
           <figcaption className="px-2 text-xs leading-relaxed text-muted-foreground lg:pointer-events-none lg:bg-white lg:shadow-sm lg:absolute lg:bottom-3 lg:left-3 lg:max-w-[calc(100%-24px)] lg:rounded-full lg:px-3.5 lg:py-1.5">

@@ -194,12 +194,14 @@ export default function Graph3D({ zoom, onZoom, orbit, data, have, learning, hid
   useEffect(() => {
     const graph = fg.current;
     if (!graph || !autoRotate || reduced) return;
-    const controls = graph.controls() as { autoRotate: boolean; autoRotateSpeed: number };
+    const controls = graph.controls() as { autoRotate: boolean; autoRotateSpeed: number; enableZoom: boolean };
     controls.autoRotateSpeed = 0.5;
+    controls.enableZoom = false; // a showcase map on a scrolling page: the wheel scrolls the page, dragging still turns it
     spinning.current = controls.autoRotate = true;
     graph.resumeAnimation();
     return () => {
       spinning.current = controls.autoRotate = false;
+      controls.enableZoom = true;
     };
   }, [autoRotate, reduced]);
 
