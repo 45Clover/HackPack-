@@ -18,7 +18,10 @@
       "name": "Every day at 6:00",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
-      "position": [0, 0]
+      "position": [
+        0,
+        0
+      ]
     },
     {
       "parameters": {
@@ -34,7 +37,30 @@
       "name": "POST /api/ingest",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [240, 0],
+      "position": [
+        240,
+        0
+      ],
+      "retryOnFail": false
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://REPLACE-WITH-LIVE-URL/api/extract?batch=8",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 90000
+        }
+      },
+      "id": "5b1c2a3e-0003-4d6a-9a11-000000000003",
+      "name": "POST /api/extract",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        480,
+        0
+      ],
       "retryOnFail": false
     }
   ],
@@ -44,6 +70,17 @@
         [
           {
             "node": "POST /api/ingest",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST /api/ingest": {
+      "main": [
+        [
+          {
+            "node": "POST /api/extract",
             "type": "main",
             "index": 0
           }
