@@ -144,9 +144,7 @@ npm run dev                  # http://localhost:3000
 | `npm run lint` · `npx tsc --noEmit` | lint and type check |
 | `npm run build` | production build; must pass before any PR |
 
-Set up the database by running the files in `db/` in Neon, in the order listed in [`AGENTS.md`](AGENTS.md).
-
-**Agents and teammates: read [`AGENTS.md`](AGENTS.md) first.** The team hub is [issue #1](https://github.com/45Clover/HackPack-/issues/1).
+Set up the database by running these files from `db/` in Neon, in order: `schema.sql` → `002_skill_categories.sql` → `003_profiles.sql` → `004_saved_jobs.sql` → `005_project_urls.sql` → `006_profile_contact.sql` → `007_boards.sql` → `008_impact_projects.sql` → `009_job_type.sql` → `010_waitlist.sql`.
 
 ## AI disclosure
 
