@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { HeroMap } from "./hero-map";
 import { Format, Hub, Rebuild } from "@lucasmarkes/hairline/react";
+import { HeroShader } from "./hero-shader";
 import { SmoothScroll } from "./smooth-scroll";
 import { Rise } from "./rise";
 import { WaitlistForm } from "@/components/waitlist/waitlist-form";
@@ -52,12 +53,9 @@ export async function Landing({ searchParams }: { searchParams: SearchParams }) 
   return (
     <Rise className="mx-auto flex w-full max-w-[1200px] flex-col gap-20 pb-10 lg:gap-28">
       <SmoothScroll />
-      {/* 1. Hero: the promise on the left, the real map turning on the right, on plain paper. */}
+      {/* 1. Hero: the promise on the left, the real map turning on the right, over the shader (edge to edge). */}
       <section className="relative isolate grid min-h-[calc(100svh-72px)] items-center gap-8 py-10 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-12 lg:py-12">
-        {/* Full bleed, from under the header to the hero's bottom edge, where it fades into the page. */}
-        <div aria-hidden className="scene-bg pointer-events-none absolute -top-[72px] bottom-0 left-1/2 -z-10 w-screen -translate-x-1/2">
-          <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-b from-transparent to-[#f4f3ef]" />
-        </div>
+        <HeroShader />
         <div className="flex min-w-0 flex-col items-start gap-6">
           <Badge data-reveal variant="outline" className="h-auto min-h-7 gap-2 bg-white px-3 py-1 text-left text-[13px] font-normal whitespace-normal text-muted-foreground">
             <span aria-hidden className="size-1.5 rounded-full bg-[var(--blue)]" />
