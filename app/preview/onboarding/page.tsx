@@ -11,13 +11,11 @@ const DICT = CATEGORIES.flatMap((c, ci) =>
 export default function OnboardingPreview() {
   if (process.env.NODE_ENV !== "development") notFound();
   return (
-    <main className="mx-auto max-w-2xl">
-      <OnboardingFlow
-        firstName="Sample"
-        skills={DICT}
-        cities={["Calgary", "Toronto", "Vancouver", "Edmonton"]}
-        initial={{ skillIds: DICT.filter((s) => ["React", "TypeScript", "Node.js"].includes(s.name)).map((s) => s.id), role: "any", city: "Calgary" }}
-      />
-    </main>
+    <OnboardingFlow
+      firstName="Sample"
+      skills={DICT}
+      cities={["Calgary", "Toronto", "Vancouver", "Edmonton"]}
+      initial={{ skillIds: DICT.filter((s) => ["React", "TypeScript", "Node.js"].includes(s.name)).map((s) => s.id), role: "any", city: "Calgary" }}
+    />
   );
 }

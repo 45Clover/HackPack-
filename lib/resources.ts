@@ -1,0 +1,76 @@
+// Owner: UI (@SaagiiSG). Hand-picked free places to learn each skill, used on the Learning guide page when the
+// AI extras (lib/extras.ts) have none yet. Official docs and well-known free courses only; every skill also gets a
+// free-video search so the section is never empty.
+export type Resource = { title: string; url: string; kind: "Official docs" | "Interactive" | "Course" | "Roadmap" | "Guide" | "Videos" };
+
+const R = (kind: Resource["kind"], title: string, url: string): Resource => ({ kind, title, url });
+
+const PICKS: Record<string, Resource[]> = {
+  python: [R("Official docs", "The Python Tutorial", "https://docs.python.org/3/tutorial/"), R("Roadmap", "Python developer roadmap", "https://roadmap.sh/python")],
+  javascript: [R("Guide", "The Modern JavaScript Tutorial", "https://javascript.info/"), R("Official docs", "MDN JavaScript Guide", "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide"), R("Roadmap", "JavaScript roadmap", "https://roadmap.sh/javascript")],
+  typescript: [R("Official docs", "The TypeScript Handbook", "https://www.typescriptlang.org/docs/handbook/intro.html"), R("Roadmap", "TypeScript roadmap", "https://roadmap.sh/typescript")],
+  react: [R("Official docs", "Learn React", "https://react.dev/learn"), R("Roadmap", "React roadmap", "https://roadmap.sh/react")],
+  "next-js": [R("Course", "Next.js Learn course", "https://nextjs.org/learn")],
+  "node-js": [R("Official docs", "Learn Node.js", "https://nodejs.org/en/learn"), R("Roadmap", "Node.js roadmap", "https://roadmap.sh/nodejs")],
+  sql: [R("Interactive", "SQLBolt lessons", "https://sqlbolt.com/"), R("Roadmap", "SQL roadmap", "https://roadmap.sh/sql")],
+  postgresql: [R("Official docs", "PostgreSQL tutorial", "https://www.postgresql.org/docs/current/tutorial.html"), R("Roadmap", "PostgreSQL roadmap", "https://roadmap.sh/postgresql-dba")],
+  mysql: [R("Official docs", "MySQL documentation", "https://dev.mysql.com/doc/")],
+  go: [R("Interactive", "A Tour of Go", "https://go.dev/tour/"), R("Roadmap", "Go roadmap", "https://roadmap.sh/golang")],
+  java: [R("Official docs", "Learn Java (dev.java)", "https://dev.java/learn/"), R("Roadmap", "Java roadmap", "https://roadmap.sh/java")],
+  kotlin: [R("Official docs", "Get started with Kotlin", "https://kotlinlang.org/docs/getting-started.html")],
+  rust: [R("Official docs", "The Rust Book", "https://doc.rust-lang.org/book/"), R("Roadmap", "Rust roadmap", "https://roadmap.sh/rust")],
+  cplusplus: [R("Guide", "LearnCpp", "https://www.learncpp.com/")],
+  net: [R("Official docs", "C# and .NET docs", "https://learn.microsoft.com/en-us/dotnet/csharp/")],
+  aws: [R("Course", "AWS Skill Builder", "https://skillbuilder.aws/"), R("Roadmap", "AWS roadmap", "https://roadmap.sh/aws")],
+  azure: [R("Course", "Azure training", "https://learn.microsoft.com/en-us/training/azure/")],
+  "google-cloud": [R("Course", "Google Cloud training", "https://cloud.google.com/learn/training")],
+  docker: [R("Official docs", "Get started with Docker", "https://docs.docker.com/get-started/"), R("Roadmap", "Docker roadmap", "https://roadmap.sh/docker")],
+  kubernetes: [R("Interactive", "Kubernetes basics", "https://kubernetes.io/docs/tutorials/kubernetes-basics/"), R("Roadmap", "Kubernetes roadmap", "https://roadmap.sh/kubernetes")],
+  terraform: [R("Course", "Terraform tutorials", "https://developer.hashicorp.com/terraform/tutorials"), R("Roadmap", "Terraform roadmap", "https://roadmap.sh/terraform")],
+  "ci-cd": [R("Official docs", "GitHub Actions docs", "https://docs.github.com/en/actions"), R("Roadmap", "DevOps roadmap", "https://roadmap.sh/devops")],
+  "github-actions": [R("Official docs", "GitHub Actions docs", "https://docs.github.com/en/actions")],
+  linux: [R("Interactive", "Linux Journey", "https://linuxjourney.com/"), R("Roadmap", "Linux roadmap", "https://roadmap.sh/linux")],
+  git: [R("Guide", "Pro Git book", "https://git-scm.com/book/en/v2"), R("Roadmap", "Git and GitHub roadmap", "https://roadmap.sh/git-github")],
+  graphql: [R("Official docs", "Learn GraphQL", "https://graphql.org/learn/"), R("Roadmap", "GraphQL roadmap", "https://roadmap.sh/graphql")],
+  mongodb: [R("Course", "MongoDB University", "https://learn.mongodb.com/"), R("Roadmap", "MongoDB roadmap", "https://roadmap.sh/mongodb")],
+  redis: [R("Official docs", "Redis docs", "https://redis.io/docs/latest/"), R("Roadmap", "Redis roadmap", "https://roadmap.sh/redis")],
+  elasticsearch: [R("Official docs", "Elastic docs", "https://www.elastic.co/guide/index.html")],
+  snowflake: [R("Official docs", "Snowflake docs", "https://docs.snowflake.com/")],
+  html: [R("Course", "Learn HTML (web.dev)", "https://web.dev/learn/html"), R("Official docs", "MDN HTML", "https://developer.mozilla.org/en-US/docs/Web/HTML")],
+  css: [R("Course", "Learn CSS (web.dev)", "https://web.dev/learn/css"), R("Official docs", "MDN CSS", "https://developer.mozilla.org/en-US/docs/Web/CSS")],
+  redux: [R("Official docs", "Redux Essentials", "https://redux.js.org/tutorials/essentials/part-1-overview-concepts")],
+  "react-native": [R("Official docs", "Get started with React Native", "https://reactnative.dev/docs/getting-started")],
+  django: [R("Official docs", "Django tutorial", "https://docs.djangoproject.com/en/stable/intro/tutorial01/")],
+  "ruby-on-rails": [R("Official docs", "Getting started with Rails", "https://guides.rubyonrails.org/getting_started.html")],
+  swift: [R("Course", "SwiftUI tutorials", "https://developer.apple.com/tutorials/swiftui")],
+  ios: [R("Course", "SwiftUI tutorials", "https://developer.apple.com/tutorials/swiftui")],
+  android: [R("Course", "Android courses", "https://developer.android.com/courses")],
+  "machine-learning": [R("Course", "Machine Learning Crash Course", "https://developers.google.com/machine-learning/crash-course"), R("Course", "Practical Deep Learning (fast.ai)", "https://course.fast.ai/")],
+  llms: [R("Course", "Hugging Face courses", "https://huggingface.co/learn")],
+  pandas: [R("Official docs", "Getting started with pandas", "https://pandas.pydata.org/docs/getting_started/index.html")],
+  pytorch: [R("Official docs", "PyTorch tutorials", "https://pytorch.org/tutorials/")],
+  tensorflow: [R("Official docs", "TensorFlow tutorials", "https://www.tensorflow.org/tutorials")],
+  spark: [R("Official docs", "Spark quick start", "https://spark.apache.org/docs/latest/quick-start.html")],
+  airflow: [R("Official docs", "Airflow docs", "https://airflow.apache.org/docs/")],
+  dbt: [R("Official docs", "dbt docs", "https://docs.getdbt.com/")],
+  tableau: [R("Course", "Tableau training", "https://www.tableau.com/learn/training")],
+  "power-bi": [R("Official docs", "Power BI docs", "https://learn.microsoft.com/en-us/power-bi/")],
+  cypress: [R("Official docs", "Cypress docs", "https://docs.cypress.io/")],
+  playwright: [R("Official docs", "Playwright intro", "https://playwright.dev/docs/intro")],
+  selenium: [R("Official docs", "Selenium docs", "https://www.selenium.dev/documentation/")],
+  microservices: [R("Guide", "Microservice patterns", "https://microservices.io/")],
+  oauth: [R("Guide", "OAuth 2.0", "https://oauth.net/2/")],
+  "system-design": [R("Guide", "The System Design Primer", "https://github.com/donnemartin/system-design-primer"), R("Roadmap", "System design roadmap", "https://roadmap.sh/system-design")],
+  "code-review": [R("Guide", "Google's code review guide", "https://google.github.io/eng-practices/review/")],
+  agile: [R("Guide", "The Agile Manifesto", "https://agilemanifesto.org/")],
+  scrum: [R("Guide", "The Scrum Guide", "https://scrumguides.org/scrum-guide.html")],
+  jira: [R("Guide", "Jira guides", "https://www.atlassian.com/software/jira/guides")],
+  figma: [R("Official docs", "Figma help centre", "https://help.figma.com/")],
+};
+
+export function resourcesFor(skill: { slug: string; name: string }): Resource[] {
+  return [
+    ...(PICKS[skill.slug] ?? []),
+    R("Videos", `Free ${skill.name} courses on YouTube`, `https://www.youtube.com/results?search_query=${encodeURIComponent(`${skill.name} full course`)}`),
+  ];
+}

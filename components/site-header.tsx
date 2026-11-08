@@ -23,8 +23,7 @@ export async function SiteHeader() {
               <UserMenu name={session.user.name ?? "You"} picture={session.user.picture ?? null} />
             </>
           ) : (
-            // Plain <a>: Auth0 routes need a full page load, not client navigation.
-            <a href="/auth/login?returnTo=/onboarding" className={buttonVariants({ size: "sm" })}>Sign in</a>
+            <Link href="/login" className={buttonVariants({ size: "sm" })}>Sign in</Link>
           )}
         </div>
       </nav>
