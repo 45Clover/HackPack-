@@ -1,9 +1,8 @@
--- 005: the board list moves from code (lib/boards.ts) into the database, so discovery can add to it.
--- Run once in Neon, after schema.sql → 002 → 003 → 004. Owner: Job data.
--- `companies` stays as it is: jobs.company_id and the UI still use it. Ingest fills it from `boards`.
+-- Run in the Neon SQL editor after schema.sql (or: psql "$DATABASE_URL" -f db/005_boards.sql). Plain Postgres, no extensions.
+-- Owner: Job data. The board list for ingest: which company feeds to fetch, and what discovery has found.
+-- v2.1: if not exists guards, so running it again is harmless. Does not change any table in schema.sql.
 
--- Every job board we fetch every day. Discovery adds rows; the daily fetch reads them.
-create table boards (
+create table if not exists boards (
   id            serial primary key,
   ats           text not null check (ats in ('ashby','greenhouse','lever')),
   board         text not null,                 -- the slug in the feed URL: jobs.ashbyhq.com/<board>
@@ -16,9 +15,7 @@ create table boards (
   unique (ats, board)
 );
 
--- Found by discovery, not checked yet. A candidate becomes a board once its feed works
--- and it has at least one Canadian tech job.
-create table board_candidates (
+create table if not exists board_candidates ( -- found by discovery, not checked yet
   ats        text not null check (ats in ('ashby','greenhouse','lever')),
   board      text not null,
   found_by   text not null,
@@ -27,15 +24,14 @@ create table board_candidates (
   primary key (ats, board)
 );
 
--- One row per discovery source. A run can take several days; `state` says where it stopped.
-create table discovery_runs (
+create table if not exists discovery_runs (   -- one row per source; a run can take several days
   source     text primary key,                 -- 'commoncrawl' | 'keenable'
   started_at timestamptz,
   done_at    timestamptz,                      -- last finished run; the next one is due done_at + its interval
-  state      jsonb not null default '{}'
+  state      jsonb not null default '{}'       -- where an unfinished run stopped
 );
 
--- The starting list (from the tutorial, all checked live on Nov 7).
+-- The starting list (from the tutorial, all checked live on Nov 7). Already there = skipped.
 insert into boards (name, ats, board, found_by) values
   ('Benevity', 'ashby', 'benevity', 'manual'),
   ('Neo Financial', 'ashby', 'neofinancial', 'manual'),
