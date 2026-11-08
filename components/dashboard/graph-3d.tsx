@@ -47,8 +47,14 @@ type Props = {
   height: number;
   autoRotate?: boolean; // the landing page: turn slowly on its own, and stay awake while turning
   refit?: boolean; // /explore: the jobs change with its filters, so frame the map again once each new layout settles
+  scrollPage?: boolean; // the map sits in a scrolling page (/explore): the wheel scrolls the page, zoom with the slider
+  fitPoints?: boolean; // frame the nodes, not their box: an orbit ring's box corners are empty, so it came out small
 };
 
+const ORBIT_VIEW = new THREE.Vector3(0, -1.2, -1).normalize(); // the orbit layout's view: from above, so the ring reads
+// fitPoints maps (/explore) sit in a wide, short frame: a flatter look makes the ring a wide ellipse that fills it, and
+// a smaller margin lets it grow (from above, the round ring was height-bound and came out a third of the frame).
+const WIDE_VIEW = new THREE.Vector3(0, -0.7, -1).normalize();
 const BLUE = "#2f5bea";
 const INK = "#1f1f1d";
 const idOf = (end: string | GNode) => (typeof end === "string" ? end : end.id);
@@ -70,7 +76,7 @@ const MIN_D = 90, MAX_D = 1250;
 const distanceToZoom = (d: number) => Math.min(100, Math.max(0, (100 * Math.log(MAX_D / d)) / Math.log(MAX_D / MIN_D)));
 const zoomToDistance = (v: number) => MAX_D * Math.pow(MIN_D / MAX_D, v / 100);
 
-export default function Graph3D({ zoom, onZoom, orbit, data, have, learning, hidden, selectedId, onSelect, onHover, hoverId, mini, width, height, autoRotate, refit }: Props) {
+export default function Graph3D({ zoom, onZoom, orbit, data, have, learning, hidden, selectedId, onSelect, onHover, hoverId, mini, width, height, autoRotate, refit, scrollPage, fitPoints }: Props) {
   const fg = useRef<ForceGraphMethods<GNode, GLink> | undefined>(undefined);
   const labels = useRef(new Map<string, CSS2DObject>());
   const groups = useRef(new Map<string, THREE.Group>());
@@ -152,6 +158,11 @@ export default function Graph3D({ zoom, onZoom, orbit, data, have, learning, hid
     if (graph) onZoom(distanceToZoom(graph.camera().position.distanceTo((graph.controls() as { target: THREE.Vector3 }).target)));
   }, [onZoom]);
 
+  // fitPoints reads the nodes through a ref: flyTo must keep its identity when the data changes, or the effects that
+  // depend on it (the "closing a card" pull-back) re-run and re-frame mid-flight.
+  const nodesRef = useRef(data.nodes);
+  useEffect(() => { nodesRef.current = data.nodes; }, [data]);
+
   // Camera moves run on GSAP (one clock for the whole app). The framing is force-graph's zoomToFit, ported:
   // back off along the view direction until every corner of the box fits. `forward` overrides the view direction.
   const flight = useRef<gsap.core.Tween | undefined>(undefined);
@@ -176,6 +187,13 @@ export default function Graph3D({ zoom, onZoom, orbit, data, have, learning, hid
         const halfH = (box.y[1] - box.y[0]) / 2;
         const halfW = Math.hypot(box.x[1] - box.x[0], box.z[1] - box.z[0]) / 2;
         distance = Math.max(halfH / Math.tan(vHalf), halfW / Math.tan(hHalf)) + halfW;
+      } else if (fitPoints) {
+        // The nodes themselves (pinned fx/fy/fz in the orbit layout, else where the layout put them).
+        for (const n of nodesRef.current as (GNode & { fx?: number; fy?: number; fz?: number; x?: number; y?: number; z?: number })[]) {
+          if (filter && !filter(n)) continue;
+          const c = new THREE.Vector3(n.fx ?? n.x ?? 0, n.fy ?? n.y ?? 0, n.fz ?? n.z ?? 0).sub(center);
+          distance = Math.max(distance, Math.max(Math.abs(c.dot(up)) / Math.tan(vHalf), Math.abs(c.dot(right)) / Math.tan(hHalf)) - c.dot(fwd));
+        }
       } else {
         for (const x of box.x) for (const y of box.y) for (const z of box.z) {
           const c = new THREE.Vector3(x, y, z).sub(center);
@@ -195,7 +213,7 @@ export default function Graph3D({ zoom, onZoom, orbit, data, have, learning, hid
         onComplete: reportZoom,
       });
     },
-    [height, reduced, wake, reportZoom, autoRotate],
+    [height, reduced, wake, reportZoom, autoRotate, fitPoints],
   );
 
   // The slider moved: slide the camera along its line of sight to the matching distance.
@@ -213,11 +231,16 @@ export default function Graph3D({ zoom, onZoom, orbit, data, have, learning, hid
   // Entrance: start high above the map and drift down to the front view while the layout settles.
   useEffect(() => {
     fg.current?.cameraPosition({ x: 0, y: 1100, z: 1500 }, { x: 0, y: 0, z: 0 }, 0);
-    const t = setTimeout(() => flyTo(2.4, 140, undefined, orbit ? new THREE.Vector3(0, -1.2, -1).normalize() : new THREE.Vector3(0, 0, -1)), 60);
+    const t = setTimeout(() => flyTo(2.4, fitPoints ? 70 : 140, undefined, orbit ? (fitPoints ? WIDE_VIEW : ORBIT_VIEW) : new THREE.Vector3(0, 0, -1)), 60);
     return () => clearTimeout(t);
     // once, when the map mounts
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    const controls = fg.current?.controls() as { enableZoom: boolean } | undefined;
+    if (controls && scrollPage) controls.enableZoom = false;
+  }, [scrollPage]);
 
   // autoRotate: OrbitControls turns the camera every frame (about two minutes a lap). Reduced motion: no turning.
   useEffect(() => {
@@ -312,8 +335,9 @@ export default function Graph3D({ zoom, onZoom, orbit, data, have, learning, hid
     settling.current = false;
     if (fitted.current || selectedRef.current) return;
     fitted.current = true;
-    flyTo(0.9, 140);
-  }, [flyTo]);
+    // fitPoints (/explore): keep its own view and margin; the dashboard keeps its framing.
+    flyTo(0.9, fitPoints ? 70 : 140, undefined, fitPoints && orbit ? WIDE_VIEW : undefined);
+  }, [flyTo, fitPoints, orbit]);
   const nodeVisibility = useCallback(
     (n: GNode) => (n.kind !== "skill" || !hidden.has(n.category ?? "")) && (!selectedId || n.id === selectedId || !!near?.has(n.id)),
     [hidden, selectedId, near],
@@ -382,7 +406,7 @@ export default function Graph3D({ zoom, onZoom, orbit, data, have, learning, hid
     paintLabels(selectedId);
     if (!selectedId) {
       wake(1400);
-      flyTo(0.9, 140); // closing a card pulls back to the whole map
+      flyTo(0.9, fitPoints ? 70 : 140, undefined, fitPoints && orbit ? WIDE_VIEW : undefined); // closing a card pulls back to the whole map
       return;
     }
     const node = data.nodes.find((n) => n.id === selectedId);
