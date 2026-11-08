@@ -21,6 +21,7 @@ export function NavMenu({ signedIn }: { signedIn: boolean }) {
         <SheetHeader><SheetTitle>Skilltrii</SheetTitle></SheetHeader>
         <nav className="flex flex-col gap-1 px-4 text-sm">
           <Link className="rounded-md px-2 py-1.5 hover:bg-muted" href="/">{signedIn ? "My dashboard" : "Home"}</Link>
+          <Link className="rounded-md px-2 py-1.5 hover:bg-muted" href="/explore">Browse mapped jobs</Link>
           {signedIn && <SheetClose className="rounded-md px-2 py-1.5 text-left hover:bg-muted" onClick={openEditProfile}>Edit my profile</SheetClose>}
           <Link className="rounded-md px-2 py-1.5 hover:bg-muted" href="/about">How it works &amp; privacy</Link>
         </nav>

@@ -34,7 +34,8 @@ export async function Landing({ searchParams }: { searchParams: SearchParams }) 
              (select count(distinct skill_id)::int from job_skills where posted_at > now() - interval '60 days') as skills,
              max(j.posted_at) as newest,
              count(*) filter (where ${inScope(scope)})::int as area
-      from jobs j where j.posted_at > now() - interval '60 days'`,
+      from jobs j where j.posted_at > now() - interval '60 days'
+        and exists (select 1 from job_skills js where js.job_id = j.id)`, // only jobs whose skills we've read: what the map can draw
     sql<{ count: number }[]>`select count(*)::int as count from waitlist`,
   ]);
 
@@ -44,7 +45,7 @@ export async function Landing({ searchParams }: { searchParams: SearchParams }) 
   const qs = scope.kind === "canada" ? "?scope=canada" : `?city=${encodeURIComponent(scope.city)}`; // the guide opens on the same area
   const fresh = stats.newest ? ago(stats.newest) : "none yet";
   const proof = [
-    { value: stats.jobs.toLocaleString("en-CA"), label: "job posts in Canada, last 60 days" },
+    { value: stats.jobs.toLocaleString("en-CA"), label: "jobs mapped in Canada, last 60 days" },
     { value: stats.internships.toLocaleString("en-CA"), label: "internships and co-ops" },
     { value: stats.companies.toLocaleString("en-CA"), label: "companies hiring" },
     { value: fresh[0].toUpperCase() + fresh.slice(1), label: "newest post" },
@@ -101,7 +102,8 @@ export async function Landing({ searchParams }: { searchParams: SearchParams }) 
           ))}
         </dl>
         <p data-reveal className="px-2 text-xs text-muted-foreground">
-          Pulled from the companies&apos; own job boards (Ashby, Greenhouse and Lever). Counts are live.
+          Pulled from the companies&apos; own job boards (Ashby, Greenhouse and Lever). We count a job once its skills are read. Counts are live.{" "}
+          <Link href="/explore" className="text-foreground underline underline-offset-4">Browse every mapped job</Link>
         </p>
       </section>
 
