@@ -10,7 +10,7 @@ export default function About() {
         <li>Google Gemini suggests portfolio projects for a skill. These are labelled &quot;AI-suggested&quot;.</li>
       </ul>
       <h2 className="text-xl font-semibold">What we store about you</h2>
-      <p>Only your Auth0 user ID and the skills you save. No name, no email. We guess your city from your connection to pick a default view, and we never store it. &quot;Delete my data&quot; removes everything.</p>
+      <p>Your sign-in ID, your name and email from that sign-in, your target role and city, and the skills you save. Never your resume: we read it in memory and throw it away. Before you sign in we store nothing; your answers wait in a cookie on your own browser. We guess your city from your connection to pick a default view, and we never store that guess. &quot;Delete my data&quot; removes everything.</p>
     </main>
   );
 }
