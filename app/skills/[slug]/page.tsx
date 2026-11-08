@@ -86,7 +86,6 @@ export default async function SkillPage({ params, searchParams }: PageProps<"/sk
       <p data-reveal className="max-w-2xl text-lg text-muted-foreground">
         Asked for in <span className="text-foreground">{total} job posts</span> at <span className="text-foreground">{companies.length} companies</span> {where}
         {learners[0].n > 0 && <>, and {learners[0].n} people here are learning it</>}.
-        {extras.adzuna_count !== null && ` ${extras.adzuna_count} Calgary job ads mention it (Adzuna).`}
       </p>
       {note && <p className="text-sm text-muted-foreground">{note}</p>}
 
