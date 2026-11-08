@@ -155,6 +155,9 @@
 
 /* Labels the 3D graph floats next to nodes. A white halo keeps them readable over links. */
 .graph-label {
+  /* Each label is moved every frame by the 3D renderer: its own layer means moving it never repaints the text or glow. */
+  will-change: transform;
+  contain: layout style paint;
   font: 500 11px/1 var(--font-geist-sans), system-ui, sans-serif;
   color: #2a2a28;
   text-shadow: 0 0 3px #f4f3ef, 0 0 6px #f4f3ef;

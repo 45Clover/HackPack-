@@ -34,7 +34,8 @@ export default async function Preview({ searchParams }: PageProps<"/preview">) {
       initialFocus={typeof sp.focus === "string" ? sp.focus : undefined}
       initialSidebarOpen={sp.sidebar !== "closed"}
       initialView={sp.view === "tree" || sp.view === "match" ? sp.view : "map"}
-      layout={sp.layout === "orbit" ? "orbit" : undefined}
+      layout={sp.layout === "force" ? "force" : undefined}
+      myRole="fullstack" // the sample student is aiming for full-stack
     />
   );
 }
