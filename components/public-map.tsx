@@ -37,7 +37,7 @@ export async function PublicMap({ searchParams }: { searchParams: SearchParams }
         {/* People + pitch adds the StatCan headline number here */}
         <ScopeSwitch scope={scope} cities={cities} />
         {note && <p className="text-sm text-muted-foreground">{note}</p>}
-        <p className="text-sm text-muted-foreground"><a className="underline underline-offset-4" href="/auth/login?returnTo=/onboarding">Sign in</a> and upload your resume to see the real jobs you&apos;re closest to.</p>
+        <p className="text-sm text-muted-foreground"><a className="underline underline-offset-4" href="/login?returnTo=/onboarding">Sign in</a> and upload your resume to see the real jobs you&apos;re closest to.</p>
       </div>
       {skills.length === 0 ? (
         <p className="text-muted-foreground">No skills yet. They appear once the ingest script has run.</p>

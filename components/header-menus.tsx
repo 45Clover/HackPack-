@@ -5,7 +5,7 @@ import { buttonVariants } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
+  DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ago } from "@/lib/ago";
 
@@ -43,7 +43,7 @@ export function NotificationsMenu({ items }: { items: Note[] }) {
         )}
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-80">
-        <DropdownMenuLabel>New jobs that match your skills</DropdownMenuLabel>
+        <DropdownMenuGroup><DropdownMenuLabel>New jobs that match your skills</DropdownMenuLabel></DropdownMenuGroup>
         <DropdownMenuSeparator />
         {items.length === 0 && <p className="px-2 py-3 text-sm text-muted-foreground">Nothing new this week.</p>}
         {items.map((n) => (
@@ -73,7 +73,7 @@ export function UserMenu({ name, picture }: { name: string; picture: string | nu
         </Avatar>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">
-        <DropdownMenuLabel>{name}</DropdownMenuLabel>
+        <DropdownMenuGroup><DropdownMenuLabel>{name}</DropdownMenuLabel></DropdownMenuGroup>
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={() => go("/onboarding")}>Edit skills &amp; resume</DropdownMenuItem>
         <DropdownMenuItem onClick={() => go("/about")}>Privacy</DropdownMenuItem>

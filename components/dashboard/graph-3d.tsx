@@ -6,8 +6,11 @@ import { useCallback, useEffect, useMemo, useRef, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import ForceGraph3D, { type ForceGraphMethods } from "react-force-graph-3d";
 import * as THREE from "three";
+import gsap from "gsap";
 import { CSS2DObject, CSS2DRenderer } from "three/addons/renderers/CSS2DRenderer.js";
 import { categoryColor } from "@/lib/categories";
+import { makeBackdrop } from "./backdrop";
+import { ORBIT_R } from "./orbit";
 
 export type GNode = {
   id: string;
@@ -16,6 +19,7 @@ export type GNode = {
   slug?: string;
   category?: string | null;
   jobId?: string;
+  title?: string; // jobs: the job title, their always-on label
   x?: number;
   y?: number;
   z?: number;
@@ -27,6 +31,9 @@ export type GNode = {
 export type GLink = { source: string | GNode; target: string | GNode; kind: "mine" | "has" | "missing" };
 
 type Props = {
+  zoom: number | null; // the zoom slider, 0–100 (null until the first camera move reports it)
+  onZoom: (v: number) => void; // tells the slider where the camera ended up (after a flight, a scroll or a drag)
+  orbit?: boolean; // the donut layout: look at it from above so the ring reads
   data: { nodes: GNode[]; links: GLink[] };
   have: Set<string>; // skill slugs you have
   learning: Set<string>; // skill slugs you started
@@ -37,53 +44,12 @@ type Props = {
   mini: (n: GNode) => ReactNode; // small card for each neighbour of the selected node
   width: number;
   height: number;
+  autoRotate?: boolean; // the landing page: turn slowly on its own, and stay awake while turning
 };
 
 const BLUE = "#2f5bea";
 const INK = "#1f1f1d";
 const idOf = (end: string | GNode) => (typeof end === "string" ? end : end.id);
-
-// A soft cumulus cloud: overlapping white puffs, a little shade underneath.
-function cloudTexture() {
-  const c = document.createElement("canvas");
-  c.width = 512;
-  c.height = 256;
-  const g = c.getContext("2d")!;
-  const puff = (x: number, y: number, r: number) => {
-    const grad = g.createRadialGradient(x, y, 0, x, y, r);
-    grad.addColorStop(0, "rgba(255,255,255,0.95)");
-    grad.addColorStop(0.55, "rgba(255,255,255,0.6)");
-    grad.addColorStop(1, "rgba(255,255,255,0)");
-    g.fillStyle = grad;
-    g.beginPath();
-    g.arc(x, y, r, 0, Math.PI * 2);
-    g.fill();
-  };
-  for (const [x, y, r] of [[140, 150, 80], [210, 120, 95], [290, 110, 105], [360, 135, 85], [250, 160, 90], [190, 165, 70], [330, 165, 75], [420, 160, 55], [90, 170, 50]]) puff(x, y, r);
-  const shade = g.createLinearGradient(0, 120, 0, 230);
-  shade.addColorStop(0, "rgba(160,165,178,0)");
-  shade.addColorStop(1, "rgba(160,165,178,0.22)");
-  g.globalCompositeOperation = "source-atop";
-  g.fillStyle = shade;
-  g.fillRect(0, 0, 512, 256);
-  return new THREE.CanvasTexture(c);
-}
-
-// A smooth pebble: an icosphere nudged by low-frequency waves, so each one is lumpy in its own way.
-function pebble(radius: number, seed: number) {
-  const geo = new THREE.IcosahedronGeometry(radius, 4);
-  const pos = geo.attributes.position;
-  const v = new THREE.Vector3();
-  for (let i = 0; i < pos.count; i++) {
-    v.fromBufferAttribute(pos, i).normalize();
-    const bump = 1 + 0.1 * Math.sin(v.x * 3 + seed) * Math.cos(v.y * 2.3 + seed * 1.7) + 0.06 * Math.sin(v.z * 4.1 + seed * 0.6);
-    v.multiplyScalar(radius * bump);
-    v.y *= 0.72; // a little flatter, like a river stone
-    pos.setXYZ(i, v.x, v.y, v.z);
-  }
-  geo.computeVertexNormals();
-  return geo;
-}
 
 function ringTexture() {
   const c = document.createElement("canvas");
@@ -97,17 +63,36 @@ function ringTexture() {
   return new THREE.CanvasTexture(c);
 }
 
-export default function Graph3D({ data, have, learning, hidden, selectedId, onSelect, hoverId, mini, width, height }: Props) {
+// Zoom slider (0–100) ↔ camera distance from the orbit target, on a log scale between the orbit limits.
+const MIN_D = 90, MAX_D = 1250;
+const distanceToZoom = (d: number) => Math.min(100, Math.max(0, (100 * Math.log(MAX_D / d)) / Math.log(MAX_D / MIN_D)));
+const zoomToDistance = (v: number) => MAX_D * Math.pow(MIN_D / MAX_D, v / 100);
+
+export default function Graph3D({ zoom, onZoom, orbit, data, have, learning, hidden, selectedId, onSelect, hoverId, mini, width, height, autoRotate }: Props) {
   const fg = useRef<ForceGraphMethods<GNode, GLink> | undefined>(undefined);
   const labels = useRef(new Map<string, CSS2DObject>());
   const groups = useRef(new Map<string, THREE.Group>());
   const carded = useRef(new Set<string>()); // nodes showing a card, so their label stays hidden
   const sleepTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const settling = useRef(true); // the force layout is still moving
+  const spinning = useRef(false); // autoRotate is on, so the scene never sleeps
   const reduced = useMemo(() => typeof window !== "undefined" && matchMedia("(prefers-reduced-motion: reduce)").matches, []);
+  const labelsDirty = useRef(true); // a label changed (shown, hidden, retitled, added), so place them again
   const css2d = useMemo(() => {
     const r = new CSS2DRenderer();
     r.domElement.style.pointerEvents = "none"; // labels never block clicks; the card turns them back on
+    // Performance: placing ~50 DOM labels every frame was most of the map's cost (hovering felt stuck). Only place them
+    // when the camera moved, the layout is still settling, or a label changed.
+    // eslint-disable-next-line react-hooks/refs -- this runs inside the 3D render loop, never during a React render
+    const place = r.render.bind(r);
+    let last = "";
+    r.render = (scene, camera) => {
+      const view = camera.matrixWorld.elements.join(",") + camera.projectionMatrix.elements.join(",");
+      if (view === last && !settling.current && !labelsDirty.current) return;
+      last = view;
+      labelsDirty.current = false;
+      place(scene, camera);
+    };
     return r;
   }, []);
   const textures = useMemo(() => ({ ring: ringTexture() }), []);
@@ -130,10 +115,16 @@ export default function Graph3D({ data, have, learning, hidden, selectedId, onSe
   // Labels: well-connected skills, and whatever you hover or select (plus their neighbours).
   const paintLabels = useCallback(
     (focus: string | null) => {
+      labelsDirty.current = true;
       const near = focus ? neighbours.get(focus) : null;
       for (const [id, obj] of labels.current) {
         const degree = neighbours.get(id)?.size ?? 0;
-        obj.visible = !carded.current.has(id) && (id === focus || !!near?.has(id) || (!focus && id.startsWith("s:") && degree >= 5));
+        obj.visible = !carded.current.has(id) && (id === focus || !!near?.has(id) || (!focus && (id.startsWith("j:") || (id.startsWith("s:") && degree >= 5))));
+        // The hovered/selected node shows its whole name; everything else stays short.
+        const el = obj.element;
+        const text = id === focus ? el.dataset.full! : el.dataset.short!;
+        if (el.textContent !== text) el.textContent = text;
+        el.toggleAttribute("data-focus", id === focus);
       }
     },
     [neighbours],
@@ -146,8 +137,115 @@ export default function Graph3D({ data, have, learning, hidden, selectedId, onSe
     if (!graph) return;
     graph.resumeAnimation();
     clearTimeout(sleepTimer.current);
-    sleepTimer.current = setTimeout(() => !settling.current && graph.pauseAnimation(), ms);
+    sleepTimer.current = setTimeout(() => !settling.current && !spinning.current && graph.pauseAnimation(), ms);
   }, []);
+
+  const reportZoom = useCallback(() => {
+    const graph = fg.current;
+    if (graph) onZoom(distanceToZoom(graph.camera().position.distanceTo((graph.controls() as { target: THREE.Vector3 }).target)));
+  }, [onZoom]);
+
+  // Camera moves run on GSAP (one clock for the whole app). The framing is force-graph's zoomToFit, ported:
+  // back off along the view direction until every corner of the box fits. `forward` overrides the view direction.
+  const flight = useRef<gsap.core.Tween | undefined>(undefined);
+  const flyTo = useCallback(
+    (secs: number, padding: number, filter?: (n: GNode) => boolean, forward?: THREE.Vector3) => {
+      const graph = fg.current;
+      const box = graph?.getGraphBbox(filter);
+      if (!graph || !box) return;
+      const camera = graph.camera() as THREE.PerspectiveCamera;
+      const target = (graph.controls() as { target: THREE.Vector3 }).target;
+      camera.updateMatrixWorld();
+      const fwd = forward ?? camera.getWorldDirection(new THREE.Vector3());
+      const right = new THREE.Vector3().crossVectors(fwd, camera.up).normalize();
+      const up = new THREE.Vector3().crossVectors(right, fwd).normalize();
+      const vHalf = ((((1 - (padding * 2) / height) * camera.fov) / 2) * Math.PI) / 180;
+      const hHalf = Math.atan(Math.tan(vHalf) * camera.aspect);
+      const center = new THREE.Vector3((box.x[0] + box.x[1]) / 2, (box.y[0] + box.y[1]) / 2, (box.z[0] + box.z[1]) / 2);
+      let distance = 0;
+      for (const x of box.x) for (const y of box.y) for (const z of box.z) {
+        const c = new THREE.Vector3(x, y, z).sub(center);
+        distance = Math.max(distance, Math.max(Math.abs(c.dot(up)) / Math.tan(vHalf), Math.abs(c.dot(right)) / Math.tan(hHalf)) - c.dot(fwd));
+      }
+      const from = { pos: camera.position.clone(), look: target.clone() };
+      const to = { pos: center.clone().addScaledVector(fwd, -distance), look: center };
+      const t = { k: 0 };
+      flight.current?.kill();
+      wake((secs + 0.4) * 1000); // keep drawing through the move
+      flight.current = gsap.to(t, {
+        k: 1,
+        duration: reduced ? 0 : secs,
+        ease: "power2.inOut",
+        onUpdate: () => graph.cameraPosition(from.pos.clone().lerp(to.pos, t.k), from.look.clone().lerp(to.look, t.k), 0),
+        onComplete: reportZoom,
+      });
+    },
+    [height, reduced, wake, reportZoom],
+  );
+
+  // The slider moved: slide the camera along its line of sight to the matching distance.
+  useEffect(() => {
+    const graph = fg.current;
+    if (!graph || zoom === null) return;
+    const target = (graph.controls() as { target: THREE.Vector3 }).target;
+    const camera = graph.camera();
+    if (Math.abs(distanceToZoom(camera.position.distanceTo(target)) - zoom) < 0.5) return; // already there
+    flight.current?.kill();
+    graph.cameraPosition(camera.position.clone().sub(target).setLength(zoomToDistance(zoom)).add(target), target, 0);
+    wake(600);
+  }, [zoom, wake]);
+
+  // Entrance: start high above the map and drift down to the front view while the layout settles.
+  useEffect(() => {
+    fg.current?.cameraPosition({ x: 0, y: 1100, z: 1500 }, { x: 0, y: 0, z: 0 }, 0);
+    const t = setTimeout(() => flyTo(2.4, 140, undefined, orbit ? new THREE.Vector3(0, -1.2, -1).normalize() : new THREE.Vector3(0, 0, -1)), 60);
+    return () => clearTimeout(t);
+    // once, when the map mounts
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // autoRotate: OrbitControls turns the camera every frame (about two minutes a lap). Reduced motion: no turning.
+  useEffect(() => {
+    const graph = fg.current;
+    if (!graph || !autoRotate || reduced) return;
+    const controls = graph.controls() as { autoRotate: boolean; autoRotateSpeed: number; enableZoom: boolean };
+    controls.autoRotateSpeed = 0.5;
+    controls.enableZoom = false; // a showcase map on a scrolling page: the wheel scrolls the page, dragging still turns it
+    spinning.current = controls.autoRotate = true;
+    graph.resumeAnimation();
+    return () => {
+      spinning.current = controls.autoRotate = false;
+      controls.enableZoom = true;
+    };
+  }, [autoRotate, reduced]);
+
+  // New data (area, role or filters changed): drop the labels of nodes that left the map. Their DOM elements live
+  // outside the scene, so removing a node's 3D object alone leaves its title floating on the new map.
+  useEffect(() => {
+    const ids = new Set(data.nodes.map((n) => n.id));
+    for (const [id, obj] of labels.current) {
+      if (ids.has(id)) continue;
+      obj.element.remove();
+      labels.current.delete(id);
+      groups.current.delete(id);
+    }
+  }, [data]);
+
+  // Orbit layout: a faint ring through the skills, so the donut reads as an orbit.
+  useEffect(() => {
+    const graph = fg.current;
+    if (!orbit || !graph) return;
+    const ring = new THREE.LineLoop(
+      new THREE.BufferGeometry().setFromPoints(Array.from({ length: 128 }, (_, i) => new THREE.Vector3(ORBIT_R * Math.cos((i / 128) * 2 * Math.PI), 0, ORBIT_R * Math.sin((i / 128) * 2 * Math.PI)))),
+      new THREE.LineBasicMaterial({ color: 0xcfcbc2 }),
+    );
+    graph.scene().add(ring);
+    return () => {
+      graph.scene().remove(ring);
+      ring.geometry.dispose();
+      (ring.material as THREE.Material).dispose();
+    };
+  }, [orbit]);
 
   // Roomy spacing, a sharp-but-cheap pixel ratio, and wake-on-input.
   useEffect(() => {
@@ -156,62 +254,30 @@ export default function Graph3D({ data, have, learning, hidden, selectedId, onSe
     // Depth haze: nodes further from the camera fade toward the paper colour, so near and far read as you orbit.
     graph.scene().fog = new THREE.FogExp2(0xf4f3ef, 0.00045);
 
-    // Backdrop (reference 3): a sea of clouds below and matte stones and spheres far out. They sit outside the
-    // camera's reach, so they always stay background, and they slide past each other as you orbit: real parallax.
-    const backdrop = new THREE.Group();
-    const cloudTex = cloudTexture();
-    const clouds: [number, number, number, number][] = [
-      [-1500, -620, -900, 1100], [-300, -700, -1700, 1300], [1300, -640, -1100, 1150], [1900, -560, 300, 900],
-      [-1900, -580, 500, 950], [400, -760, 1500, 1200], [-900, -680, 1700, 1000], [800, -300, -2300, 1000],
-      [-1500, 200, -2000, 850], [2100, 120, -1300, 800],
-    ];
-    for (const [x, y, z, w] of clouds) {
-      const cloud = new THREE.Sprite(new THREE.SpriteMaterial({ map: cloudTex, transparent: true, depthWrite: false, fog: false, opacity: 0.9 }));
-      cloud.position.set(x, y, z);
-      cloud.scale.set(w, w / 2, 1);
-      backdrop.add(cloud);
-    }
-    const objects: { geo: THREE.BufferGeometry; color: string; at: [number, number, number] }[] = [
-      { geo: new THREE.SphereGeometry(230, 48, 48), color: "#2f5bea", at: [-1250, -380, -1700] },
-      { geo: new THREE.SphereGeometry(260, 48, 48), color: "#9aa6b8", at: [1500, -520, -1500] },
-      { geo: new THREE.SphereGeometry(150, 48, 48), color: "#ffffff", at: [900, 520, -1800] },
-      { geo: pebble(140, 1), color: "#d8cfbf", at: [-1700, -260, -300] },
-      { geo: pebble(110, 2), color: "#e6dfd2", at: [1750, -200, 700] },
-      { geo: pebble(170, 3), color: "#cfc6b5", at: [-300, -620, 1750] },
-      { geo: pebble(90, 4), color: "#bfc7d3", at: [500, 650, 1600] },
-    ];
-    for (const o of objects) {
-      const mesh = new THREE.Mesh(o.geo, new THREE.MeshLambertMaterial({ color: o.color, fog: false }));
-      mesh.position.set(...o.at);
-      backdrop.add(mesh);
-    }
-    graph.scene().add(backdrop);
+    const backdrop = makeBackdrop();
+    graph.scene().add(backdrop.group);
     const controls = graph.controls() as { maxDistance?: number; minDistance?: number };
-    controls.maxDistance = 1250; // stay inside the backdrop so it never blocks the map
-    controls.minDistance = 90;
+    controls.maxDistance = MAX_D; // stay inside the backdrop so it never blocks the map
+    controls.minDistance = MIN_D;
 
     graph.d3Force("charge")?.strength(-340);
     graph.d3Force("link")?.distance((l: GLink) => (l.kind === "mine" ? 80 : 125));
 
     graph.renderer().setPixelRatio(Math.min(window.devicePixelRatio, 1.5)); // Retina at 2x = 4x the pixels to draw
 
+    (graph.controls() as unknown as THREE.EventDispatcher<{ end: object }>).addEventListener("end", reportZoom); // scroll or drag finished
     const canvas = graph.renderer().domElement;
     const onInput = () => wake();
     for (const type of ["pointerdown", "pointermove", "wheel", "touchstart"]) canvas.addEventListener(type, onInput, { passive: true });
     return () => {
       for (const type of ["pointerdown", "pointermove", "wheel", "touchstart"]) canvas.removeEventListener(type, onInput);
+      (graph.controls() as unknown as THREE.EventDispatcher<{ end: object }>).removeEventListener("end", reportZoom);
       clearTimeout(sleepTimer.current);
       graph.scene().fog = null;
-      graph.scene().remove(backdrop);
-      backdrop.traverse((o) => {
-        if (o instanceof THREE.Mesh || o instanceof THREE.Sprite) {
-          o.geometry.dispose();
-          (o.material as THREE.Material).dispose();
-        }
-      });
-      cloudTex.dispose();
+      graph.scene().remove(backdrop.group);
+      backdrop.dispose();
     };
-  }, [wake]);
+  }, [wake, reportZoom]);
 
   // Anything that changes what's drawn wakes the scene for a moment.
   useEffect(() => {
@@ -219,7 +285,43 @@ export default function Graph3D({ data, have, learning, hidden, selectedId, onSe
   }, [wake, hidden, have, learning, selectedId]);
 
   const near = useMemo(() => (selectedId ? neighbours.get(selectedId) ?? new Set<string>() : null), [selectedId, neighbours]);
-  const inFocus = (id: string) => !selectedId || id === selectedId || !!near?.has(id);
+  // Everything handed to ForceGraph3D keeps its identity between renders. A new function on every render made
+  // force-graph restart its engine each time; each restart "finished" by re-fitting the camera, whose zoom report
+  // re-rendered the dashboard: a loop that kept the map busy and slow to answer the cursor.
+  const fitted = useRef(false); // the first time the layout settles, fit the camera; later stops don't move it
+  const onEngineStop = useCallback(() => {
+    settling.current = false;
+    if (fitted.current || selectedRef.current) return;
+    fitted.current = true;
+    flyTo(0.9, 140);
+  }, [flyTo]);
+  const nodeVisibility = useCallback(
+    (n: GNode) => (n.kind !== "skill" || !hidden.has(n.category ?? "")) && (!selectedId || n.id === selectedId || !!near?.has(n.id)),
+    [hidden, selectedId, near],
+  );
+  const linkVisibility = useCallback(
+    (l: GLink) => {
+      const t = typeof l.target === "string" ? null : l.target;
+      const ends = !selectedId || idOf(l.source) === selectedId || idOf(l.target) === selectedId;
+      return ends && (!t || t.kind !== "skill" || !hidden.has(t.category ?? ""));
+    },
+    [hidden, selectedId],
+  );
+  const linkColor = useCallback(
+    (l: GLink) => {
+      if (hoverId && idOf(l.source) !== hoverId && idOf(l.target) !== hoverId) return "#e6e3dc"; // faded while you hover a row
+      return l.kind === "has" ? "#9c988f" : "#cfcbc2";
+    },
+    [hoverId],
+  );
+  const onNodeHover = useCallback(
+    (n: GNode | null) => {
+      document.body.style.cursor = n ? "pointer" : "";
+      paintLabels(n?.id ?? hoverId ?? selectedId);
+    },
+    [paintLabels, hoverId, selectedId],
+  );
+  const onBackgroundClick = useCallback(() => onSelect(null), [onSelect]);
 
   // Up to 6 neighbours of the selected node get their own small card (your second sketch); more would pile up.
   const miniHosts = useMemo(() => {
@@ -260,7 +362,7 @@ export default function Graph3D({ data, have, learning, hidden, selectedId, onSe
     paintLabels(selectedId);
     if (!selectedId) {
       wake(1400);
-      graph?.zoomToFit(reduced ? 0 : 900, 140); // closing a card pulls back to the whole map
+      flyTo(0.9, 140); // closing a card pulls back to the whole map
       return;
     }
     const node = data.nodes.find((n) => n.id === selectedId);
@@ -271,6 +373,7 @@ export default function Graph3D({ data, have, learning, hidden, selectedId, onSe
       if (n) pinned.push([new CSS2DObject(host), n]);
     }
     for (const [obj] of pinned) graph.scene().add(obj);
+    labelsDirty.current = true;
     let raf = 0;
     const follow = () => {
       for (const [obj, n] of pinned) obj.position.set(n.x ?? 0, n.y ?? 0, n.z ?? 0);
@@ -278,14 +381,23 @@ export default function Graph3D({ data, have, learning, hidden, selectedId, onSe
     };
     follow();
     wake(1800); // keep drawing through the camera move
-    graph.zoomToFit(reduced ? 0 : 1000, 160, (n: GNode) => n.id === selectedId || !!near?.has(n.id));
+    flyTo(1, 160, (n: GNode) => n.id === selectedId || !!near?.has(n.id));
     return () => {
       cancelAnimationFrame(raf);
       for (const [obj] of pinned) graph.scene().remove(obj); // CSS2DObject removes its element on "removed"
     };
     // miniHosts changes exactly when the selection does
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [miniHosts, data, wake]);
+  }, [miniHosts, data, wake, flyTo]);
+
+  // Each neighbour card unfolds out of its node, one after another. Stable, so re-renders don't replay it.
+  const unfold = useCallback(
+    (el: HTMLElement | null) => {
+      if (!el || reduced) return;
+      gsap.fromTo(el, { opacity: 0, scale: 0.85, y: 8 }, { opacity: 1, scale: 1, y: 0, duration: 0.6, ease: "power3.out", delay: Number(el.dataset.i) * 0.06, transformOrigin: "50% 100%" });
+    },
+    [reduced],
+  );
 
   // Stable, so selecting a node doesn't rebuild every node; it only changes when your skills do.
   const nodeObject = useCallback(
@@ -295,7 +407,7 @@ export default function Graph3D({ data, have, learning, hidden, selectedId, onSe
       const isLearning = n.kind === "skill" && !!n.slug && learning.has(n.slug);
       const color = new THREE.Color(n.kind === "job" ? INK : categoryColor(n.category));
       const degree = neighbours.get(n.id)?.size ?? 1;
-      const size = n.kind === "job" ? 3 : 2.6 + Math.sqrt(degree) * 0.9;
+      const size = n.kind === "job" ? 8 : 2.6 + Math.sqrt(degree) * 0.9;
 
       if (n.kind === "skill" && !isHave) {
         // A skill you don't have yet: a thin hollow ring (cobalt once you've started it).
@@ -312,13 +424,18 @@ export default function Graph3D({ data, have, learning, hidden, selectedId, onSe
       labels.current.get(n.id)?.element.remove(); // drop the label from the previous build so it does not linger
       const el = document.createElement("div");
       el.className = "graph-label";
-      el.textContent = n.label.length > 40 ? `${n.label.slice(0, 38)}…` : n.label;
+      el.dataset.full = n.label;
+      // Jobs show their title until you hover them (then title · company); skills show their name. Long ones get cut.
+      const name = n.title ?? n.label;
+      el.dataset.short = name.length > 26 ? `${name.slice(0, 24)}…` : name;
+      el.textContent = el.dataset.short;
       el.dataset.kind = n.kind;
       const label = new CSS2DObject(el);
       label.position.set(0, -size - 7, 0);
       group.add(label);
       labels.current.set(n.id, label);
       groups.current.set(n.id, group);
+      labelsDirty.current = true;
       queueMicrotask(() => paintLabels(selectedRef.current));
       return group;
     },
@@ -338,39 +455,24 @@ export default function Graph3D({ data, have, learning, hidden, selectedId, onSe
         extraRenderers={[css2d] as never} // CSS2DRenderer works here; three types and 3d-force-graph types disagree
         cooldownTicks={180}
         warmupTicks={30}
-        onEngineStop={() => {
-          settling.current = false;
-          if (!selectedId) fg.current?.zoomToFit(900, 140);
-          wake(1200); // let the zoom finish, then sleep
-        }}
-        nodeVisibility={(n) => (n.kind !== "skill" || !hidden.has(n.category ?? "")) && inFocus(n.id)}
-        linkVisibility={(l) => {
-          const t = typeof l.target === "string" ? null : l.target;
-          const ends = !selectedId || idOf(l.source) === selectedId || idOf(l.target) === selectedId;
-          return ends && (!t || t.kind !== "skill" || !hidden.has(t.category ?? ""));
-        }}
-        linkColor={(l) => {
-          const focus = hoverId;
-          if (focus && idOf(l.source) !== focus && idOf(l.target) !== focus) return "#e6e3dc"; // faded while you hover a row
-          return l.kind === "has" ? "#9c988f" : "#cfcbc2";
-        }}
+        onEngineStop={onEngineStop}
+        nodeVisibility={nodeVisibility}
+        linkVisibility={linkVisibility}
+        linkColor={linkColor}
         linkOpacity={0.6}
         linkWidth={0}
         linkCurvature={0.22}
-        onNodeHover={(n) => {
-          document.body.style.cursor = n ? "pointer" : "";
-          paintLabels(n?.id ?? hoverId ?? selectedId);
-        }}
-        onNodeClick={(n) => onSelect(n)}
-        onBackgroundClick={() => onSelect(null)}
+        onNodeHover={onNodeHover}
+        onNodeClick={onSelect}
+        onBackgroundClick={onBackgroundClick}
         nodeThreeObject={nodeObject}
       />
-      {[...miniHosts].map(([id, host]) => {
+      {[...miniHosts].map(([id, host], i) => {
         const n = data.nodes.find((x) => x.id === id);
         return n
           ? createPortal(
               <div className="mini-wrap">
-                <button className="surface block max-w-[200px] rounded-2xl px-3 py-2 text-left text-xs text-foreground hover:ring-1 hover:ring-foreground/20" onClick={() => onSelect(n)}>
+                <button ref={unfold} data-i={i} className="surface block max-w-[200px] rounded-2xl px-3 py-2 text-left text-xs text-foreground hover:ring-1 hover:ring-foreground/20" onClick={() => onSelect(n)}>
                   {mini(n)}
                 </button>
               </div>,

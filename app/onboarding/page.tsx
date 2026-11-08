@@ -1,18 +1,19 @@
 import { headers } from "next/headers";
-import { redirect } from "next/navigation";
-import { auth0 } from "@/lib/auth0";
+import { auth0, authReady } from "@/lib/auth0";
 import { sql } from "@/lib/db";
 import { getProfile } from "@/lib/dashboard";
+import { readGuest } from "@/lib/guest";
 import { OnboardingFlow } from "@/components/onboarding/onboarding-flow";
 
+// Signed in: edit your saved answers. A guest: same flow, answers kept in a cookie until they sign in (value first).
 export default async function Onboarding() {
-  const session = await auth0.getSession();
-  if (!session) redirect("/auth/login?returnTo=/onboarding");
-  const sub = session.user.sub;
+  const session = authReady ? await auth0.getSession() : null;
+  const sub = session?.user.sub;
 
-  const [profile, mine, allSkills, cities] = await Promise.all([
-    getProfile(sub),
-    sql<{ id: number }[]>`select skill_id as id from user_skills where user_sub = ${sub} and status = 'have'`,
+  const [profile, mine, guest, allSkills, cities] = await Promise.all([
+    sub ? getProfile(sub) : null,
+    sub ? sql<{ id: number }[]>`select skill_id as id from user_skills where user_sub = ${sub} and status = 'have'` : [],
+    sub ? null : readGuest(),
     sql<{ id: number; slug: string; name: string; category: string | null }[]>`
       select s.id, s.slug, s.name, s.category from skills s
       join job_skills js on js.skill_id = s.id group by s.id order by count(*) desc`,
@@ -23,13 +24,15 @@ export default async function Onboarding() {
   const guessCity = header ? decodeURIComponent(header) : "Calgary";
 
   return (
-    <main className="mx-auto max-w-2xl">
-      <OnboardingFlow
-        firstName={session.user.given_name ?? session.user.name?.split(" ")[0] ?? "there"}
-        skills={[...allSkills]}
-        cities={cities.map((c) => c.city)}
-        initial={{ skillIds: mine.map((m) => m.id), role: profile?.target_role ?? "any", city: profile?.city ?? guessCity }}
-      />
-    </main>
+    <OnboardingFlow
+      firstName={session ? session.user.given_name ?? session.user.name?.split(" ")[0] ?? "there" : undefined}
+      skills={[...allSkills]}
+      cities={cities.map((c) => c.city)}
+      initial={
+        session
+          ? { skillIds: mine.map((m) => m.id), role: profile?.target_role ?? "any", city: profile?.city ?? guessCity }
+          : { skillIds: guest?.skillIds ?? [], role: guest?.role ?? "any", city: guest?.city ?? guessCity }
+      }
+    />
   );
 }

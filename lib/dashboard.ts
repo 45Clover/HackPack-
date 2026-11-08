@@ -7,7 +7,8 @@ export type Profile = { target_role: string | null; city: string | null };
 export type MySkill = { id: number; slug: string; name: string; category: string | null };
 export type GraphJob = { id: string; title: string; url: string; company: string; city: string | null; remote: boolean; posted_at: Date; have: number; needed: number };
 export type GraphLink = { job_id: string; skill_id: number; slug: string; name: string; category: string | null; required: boolean; has: boolean };
-export type Leader = { slug: string; name: string; category: string | null; jobs: number; has: boolean };
+// week / prev: job posts asking for it in the last 7 days vs the 7 days before (the trend arrow).
+export type Leader = { slug: string; name: string; category: string | null; jobs: number; has: boolean; week: number; prev: number };
 export type NextSkill = { slug: string; name: string; jobs: number } | null;
 
 export async function getProfile(sub: string) {
@@ -16,17 +17,23 @@ export async function getProfile(sub: string) {
 }
 
 export async function getDashboard(sub: string, scope: Scope, roleSlug: string | null) {
+  const mine = await sql<MySkill[]>`
+    select s.id, s.slug, s.name, s.category from user_skills us join skills s on s.id = us.skill_id
+    where us.user_sub = ${sub} and us.status = 'have' order by s.name`;
+  return getDashboardFor([...mine], scope, roleSlug);
+}
+
+// The dashboard for a set of skills: the signed-in user's, or /preview's sample resume.
+export async function getDashboardFor(mine: MySkill[], scope: Scope, roleSlug: string | null) {
   const area = inScope(scope);
   const titles = roleBySlug(roleSlug).titles;
   const roleFilter = titles ? sql`and j.title ~* ${titles}` : sql``;
+  const ids = mine.map((m) => m.id);
 
-  const [mine, jobs, leaders] = await Promise.all([
-    sql<MySkill[]>`
-      select s.id, s.slug, s.name, s.category from user_skills us join skills s on s.id = us.skill_id
-      where us.user_sub = ${sub} and us.status = 'have' order by s.name`,
-    // The 15 jobs you're closest to: share of their MUST-HAVE skills you already have.
+  const [jobs, leaders] = await Promise.all([
+    // The 15 jobs you're closest to: share of their MUST-HAVE skills you already have. No skills (a guest): the newest 15.
     sql<GraphJob[]>`
-      with mine as (select skill_id from user_skills where user_sub = ${sub} and status = 'have')
+      with mine as (select unnest(${ids}::int[]) as skill_id)
       select j.id, j.title, j.url, c.name as company, j.city, j.remote, j.posted_at,
              count(*) filter (where js.required and js.skill_id in (select skill_id from mine))::int as have,
              count(*) filter (where js.required)::int as needed
@@ -35,22 +42,25 @@ export async function getDashboard(sub: string, scope: Scope, roleSlug: string |
       join job_skills js on js.job_id = j.id
       where j.posted_at > now() - interval '60 days' and ${area} ${roleFilter}
       group by j.id, c.name
-      having count(*) filter (where js.skill_id in (select skill_id from mine)) > 0
+      ${ids.length ? sql`having count(*) filter (where js.skill_id in (select skill_id from mine)) > 0` : sql``}
       order by count(*) filter (where js.required and js.skill_id in (select skill_id from mine))::float
                / greatest(count(*) filter (where js.required), 1) desc, j.posted_at desc
       limit 15`,
+    // Top 50, so a category filter still has its own top 10 to show.
     sql<Leader[]>`
       select s.slug, s.name, s.category, count(distinct js.job_id)::int as jobs,
-             exists (select 1 from user_skills us where us.user_sub = ${sub} and us.skill_id = s.id and us.status = 'have') as has
+             s.id = any(${ids}::int[]) as has,
+             count(distinct js.job_id) filter (where js.posted_at > now() - interval '7 days')::int as week,
+             count(distinct js.job_id) filter (where js.posted_at <= now() - interval '7 days' and js.posted_at > now() - interval '14 days')::int as prev
       from job_skills js join skills s on s.id = js.skill_id join jobs j on j.id = js.job_id
       where js.posted_at > now() - interval '60 days' and ${area}
-      group by s.id order by jobs desc limit 10`,
+      group by s.id order by jobs desc limit 50`,
   ]);
 
   const links = jobs.length
     ? await sql<GraphLink[]>`
         select js.job_id, s.id as skill_id, s.slug, s.name, s.category, js.required,
-               exists (select 1 from user_skills us where us.user_sub = ${sub} and us.skill_id = s.id and us.status = 'have') as has
+               s.id = any(${ids}::int[]) as has
         from job_skills js join skills s on s.id = js.skill_id
         where js.job_id = any(${jobs.map((j) => j.id)}::text[])`
     : [];
@@ -65,7 +75,7 @@ export async function getDashboard(sub: string, scope: Scope, roleSlug: string |
   }
   const nextSkill: NextSkill = [...missing.values()].sort((a, b) => b.jobs - a.jobs)[0] ?? null;
 
-  return { mine: [...mine], jobs: [...jobs], links: [...links], leaders: [...leaders], nextSkill };
+  return { mine, jobs: [...jobs], links: [...links], leaders: [...leaders], nextSkill };
 }
 
 // New jobs from the last 7 days in your city (or remote in Canada) that ask for at least one skill you have.
