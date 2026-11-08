@@ -207,6 +207,10 @@ export function DashboardShell({ user, role, scope, cities, mine, jobs, links, l
   const root = useRef<HTMLDivElement>(null);
   const layer = useRef<HTMLDivElement>(null); // the 3D map / tree backdrop
   const treeBox = useRef<HTMLDivElement>(null);
+  // Phones: the cards and the map are two screens side by side; swipe, or use the switch at the bottom.
+  const pager = useRef<HTMLDivElement>(null);
+  const [pane, setPane] = useState(0);
+  const showPane = (i: number) => pager.current?.scrollTo({ left: i * pager.current.clientWidth, behavior: "smooth" });
 
   // Entrance: panels slide in from the edges they're docked to. `.enter` starts them hidden (with a CSS fallback reveal);
   // once they're in, the class comes off so later GSAP fades (like the category bar's) aren't overridden by it.
@@ -338,8 +342,15 @@ export function DashboardShell({ user, role, scope, cities, mine, jobs, links, l
         </div>
       )}
 
-      {/* Mobile: the panels stack over the graph. Desktop: they slide out from the screen edges (Saagii's mockup). */}
-      <div className="pointer-events-none relative z-10 flex flex-col gap-4 lg:contents">
+      {/* Phones: two screens side by side, the cards and then the map (it's the fixed layer behind, so the second
+          screen is see-through). Swipe on the cards, or use the switch at the bottom. Desktop: unchanged. */}
+      <div
+        ref={pager}
+        onScroll={(e) => setPane(Math.round(e.currentTarget.scrollLeft / e.currentTarget.clientWidth))}
+        className="pointer-events-none fixed inset-0 z-10 flex snap-x snap-mandatory overflow-x-auto overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:contents"
+      >
+      {/* Mobile: the panels stack (the first screen). Desktop: they slide out from the screen edges (Saagii's mockup). */}
+      <div className="pointer-events-none relative z-10 flex h-full w-full shrink-0 snap-start flex-col gap-4 overflow-y-auto px-4 pt-[72px] pb-24 lg:contents">
         {/* LEFT: the student card (collapsible) and the black Learning card (always there). No cards inside cards. */}
         <div data-enter="left" className="enter flex flex-col gap-4 lg:fixed lg:top-[122px] lg:bottom-0 lg:left-0 lg:w-[clamp(250px,18.6vw,330px)] lg:gap-[30px]">
         <div className={`relative min-h-0 flex-1 lg:transition-transform lg:duration-500 lg:ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none ${leftOpen ? "" : "lg:-translate-x-full"}`}>
@@ -632,6 +643,21 @@ export function DashboardShell({ user, role, scope, cities, mine, jobs, links, l
             </>
           )}
         </aside>
+      </div>
+      <div aria-hidden className="h-full w-full shrink-0 snap-start lg:hidden" />
+      </div>
+
+      <div role="group" aria-label="Show" className="surface fixed bottom-5 left-1/2 z-30 flex -translate-x-1/2 rounded-full p-1 lg:hidden">
+        {["Cards", "Map"].map((label, i) => (
+          <button
+            key={label}
+            aria-pressed={pane === i}
+            onClick={() => showPane(i)}
+            className={`rounded-full px-4 py-1.5 text-sm transition-colors ${pane === i ? "bg-[var(--ink)] text-white" : "text-muted-foreground"}`}
+          >
+            {label}
+          </button>
+        ))}
       </div>
     </div>
   );
