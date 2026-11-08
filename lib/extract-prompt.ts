@@ -21,8 +21,9 @@ export type ExtractResult = {
   }[];
 };
 
-// ~4,000 characters keeps 20 jobs well inside one request; the skills sit near the top of a post.
-const MAX_DESCRIPTION = 4000;
+// 12,000 characters: most posts fit whole (median 7,291). At 4,000, 36 of 149 jobs lost their
+// "Requirements" section and got no skills. 20 × 12k chars ≈ 60k tokens, far under the 250k/min limit.
+export const MAX_DESCRIPTION = 12000;
 
 export function buildExtractInput(jobs: { id: string; title: string; description: string }[]) {
   return JSON.stringify(jobs.map((j) => ({ id: j.id, title: j.title, description: j.description.slice(0, MAX_DESCRIPTION) })));
