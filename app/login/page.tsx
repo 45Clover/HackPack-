@@ -6,7 +6,7 @@ import { authReady } from "@/lib/auth0";
 import { BrandPanel } from "@/components/brand-panel";
 import { buttonVariants } from "@/components/ui/button";
 
-export const metadata: Metadata = { title: "Sign in | Skilltri" };
+export const metadata: Metadata = { title: "Sign in | Skilltrii" };
 
 // Same-site paths only: "//evil.com" and "/\evil.com" are other sites to a browser, control characters get stripped
 // into one. Auth0 checks returnTo again on its side.
@@ -33,7 +33,7 @@ export default async function Login({ searchParams }: PageProps<"/login">) {
 
       <section className="flex min-h-dvh flex-col px-6 py-8 md:px-16 md:py-10">
         <div className="flex items-center">
-          <span className="text-[15px] font-semibold tracking-tight md:hidden">Skilltri</span>
+          <span className="text-[15px] font-semibold tracking-tight md:hidden">Skilltrii</span>
           <Link href="/" className={buttonVariants({ variant: "ghost", size: "sm", className: "ml-auto text-muted-foreground md:-ml-2.5" })}>
             <ArrowLeftIcon /> Back
           </Link>
@@ -41,7 +41,7 @@ export default async function Login({ searchParams }: PageProps<"/login">) {
 
         <div className="rise-in my-auto w-full max-w-md space-y-8 py-10">
           <div className="space-y-2">
-            <h1 className="text-3xl font-semibold tracking-tight">{claiming ? "Save your skill map" : "Sign in to Skilltri"}</h1>
+            <h1 className="text-3xl font-semibold tracking-tight">{claiming ? "Save your skill map" : "Sign in to Skilltrii"}</h1>
             <p className="text-muted-foreground">
               {claiming
                 ? "Sign in and we keep the skills you just picked, so your map is here next time."

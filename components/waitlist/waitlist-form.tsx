@@ -33,7 +33,7 @@ export function WaitlistForm({ source }: { source: Source }) {
   return (
     <div aria-live="polite">
       {state.done ? (
-        <p className="text-lg font-semibold tracking-tight">You&apos;re on the list. We&apos;ll email you once when Skilltri opens.</p>
+        <p className="text-lg font-semibold tracking-tight">You&apos;re on the list. We&apos;ll email you once when Skilltrii opens.</p>
       ) : (
         <form onSubmit={submit} className="flex flex-col gap-5">
           <div className="grid gap-4 sm:grid-cols-2">
@@ -68,7 +68,7 @@ export function WaitlistForm({ source }: { source: Source }) {
             <Button type="submit" disabled={state.busy} className="h-11 px-5 text-[15px] active:scale-[0.97] max-sm:w-full">
               {state.busy ? "Joining…" : "Join the waitlist"}
             </Button>
-            <p className="text-sm text-muted-foreground">We&apos;ll email you once when Skilltri opens. Nothing else, and we never share it.</p>
+            <p className="text-sm text-muted-foreground">We&apos;ll email you once when Skilltrii opens. Nothing else, and we never share it.</p>
           </div>
         </form>
       )}

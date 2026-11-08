@@ -17,7 +17,7 @@ export function EarlyAccess({ source }: { source: Source }) {
 
       <section className="flex min-h-dvh flex-col px-6 py-8 md:px-16 md:py-10">
         <div className="flex items-center">
-          <span className="text-[15px] font-semibold tracking-tight md:hidden">Skilltri</span>
+          <span className="text-[15px] font-semibold tracking-tight md:hidden">Skilltrii</span>
           <Link href="/" className={buttonVariants({ variant: "ghost", size: "sm", className: "ml-auto text-muted-foreground md:-ml-2.5" })}>
             <ArrowLeftIcon /> Back
           </Link>
@@ -25,7 +25,7 @@ export function EarlyAccess({ source }: { source: Source }) {
 
         <div className="rise-in my-auto w-full max-w-md space-y-8 py-10">
           <div className="space-y-2">
-            <h1 className="text-3xl font-semibold tracking-tight">Get early access to Skilltri</h1>
+            <h1 className="text-3xl font-semibold tracking-tight">Get early access to Skilltrii</h1>
             <p className="text-muted-foreground">It&apos;s in beta from Hack the Change 2026. Join and we&apos;ll tell you the day it opens.</p>
           </div>
           <WaitlistForm source={source} />
