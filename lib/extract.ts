@@ -12,8 +12,15 @@ export type JobInput = { id: string; title: string; description: string };
 export type JobSkills = ExtractResult["jobs"][number];
 
 export const MAX_BATCH = 20;
-// Each model has its own daily quota. When the main one is used up, try the lighter one.
-const MODELS = ["gemini-flash-latest", "gemini-flash-lite-latest"];
+
+// Read ?batch=N from a request URL. Missing or invalid → the full batch (20).
+export function batchSize(url: string): number {
+  const n = Number(new URL(url).searchParams.get("batch"));
+  return Number.isInteger(n) && n >= 1 && n <= MAX_BATCH ? n : MAX_BATCH;
+}
+// Each model has its own daily quota. When the main one is used up or overloaded, try the lighter one.
+// Pinned names (not "-latest" aliases), so the model can't silently change under us mid-demo.
+const MODELS = ["gemini-3.8-flash", "gemini-3.5-flash-lite"];
 const MIN_GAP_MS = 13_000; // free tier allows 5 requests per minute → at most one call every 12 s
 
 const CATEGORY_SLUGS = new Set<string>(CATEGORIES.map((c) => c.slug));
