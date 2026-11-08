@@ -198,7 +198,7 @@ export default function Graph3D({ zoom, onZoom, orbit, data, have, learning, hid
   // Entrance: start high above the map and drift down to the front view while the layout settles.
   useEffect(() => {
     fg.current?.cameraPosition({ x: 0, y: 1100, z: 1500 }, { x: 0, y: 0, z: 0 }, 0);
-    const t = setTimeout(() => flyTo(2.4, 140, undefined, orbit ? new THREE.Vector3(0, -0.75, -1).normalize() : new THREE.Vector3(0, 0, -1)), 60);
+    const t = setTimeout(() => flyTo(2.4, 140, undefined, orbit ? new THREE.Vector3(0, -1.2, -1).normalize() : new THREE.Vector3(0, 0, -1)), 60);
     return () => clearTimeout(t);
     // once, when the map mounts
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -427,7 +427,7 @@ export default function Graph3D({ zoom, onZoom, orbit, data, have, learning, hid
       el.dataset.full = n.label;
       // Jobs show their title until you hover them (then title · company); skills show their name. Long ones get cut.
       const name = n.title ?? n.label;
-      el.dataset.short = name.length > 34 ? `${name.slice(0, 32)}…` : name;
+      el.dataset.short = name.length > 26 ? `${name.slice(0, 24)}…` : name;
       el.textContent = el.dataset.short;
       el.dataset.kind = n.kind;
       const label = new CSS2DObject(el);

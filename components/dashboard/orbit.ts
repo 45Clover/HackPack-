@@ -6,6 +6,7 @@ import type { GLink, GNode } from "./graph-3d";
 
 export const ORBIT_R = 300;
 const R = ORBIT_R, TUBE = 55;
+const INNER = 140, LANE = 55; // the jobs' ring inside the skills' ring, and the gap between its two lanes
 
 export function orbitLayout(nodes: GNode[], links: GLink[]) {
   const order: string[] = CATEGORIES.map((c) => c.slug);
@@ -20,10 +21,21 @@ export function orbitLayout(nodes: GNode[], links: GLink[]) {
     Object.assign(n, { fx: r * Math.cos(t), fy: TUBE * Math.sin(phi), fz: r * Math.sin(t) });
     angle.set(n.id, t);
   });
-  nodes.filter((n) => n.kind === "job").forEach((j, k) => {
-    const ts = links.filter((l) => l.source === j.id).map((l) => angle.get(l.target as string)).filter((t): t is number => t !== undefined);
-    const t = Math.atan2(ts.reduce((s, x) => s + Math.sin(x), 0), ts.reduce((s, x) => s + Math.cos(x), 0)); // circular mean
-    const r = 140 + (k % 3) * 35;
-    Object.assign(j, { fx: r * Math.cos(t), fy: ((k % 5) - 2) * 18, fz: r * Math.sin(t) });
+  // Jobs: each one's natural spot is the average direction of the skills it asks for, but most jobs share the same
+  // popular skills, so they piled up on one side. Keep their order around the ring, then space them evenly on an inner
+  // ring (two lanes, so neighbouring titles don't collide), turned to sit as close to their natural spots as possible.
+  const jobs = nodes
+    .filter((n) => n.kind === "job")
+    .map((j) => {
+      const ts = links.filter((l) => l.source === j.id).map((l) => angle.get(l.target as string)).filter((t): t is number => t !== undefined);
+      return { j, t: Math.atan2(ts.reduce((a, x) => a + Math.sin(x), 0), ts.reduce((a, x) => a + Math.cos(x), 0)) }; // circular mean
+    })
+    .sort((a, b) => a.t - b.t);
+  const step = (2 * Math.PI) / Math.max(jobs.length, 1);
+  const turn = Math.atan2(jobs.reduce((a, { t }, k) => a + Math.sin(t - k * step), 0), jobs.reduce((a, { t }, k) => a + Math.cos(t - k * step), 0));
+  jobs.forEach(({ j }, k) => {
+    const t = turn + k * step;
+    const r = INNER + (k % 2) * LANE;
+    Object.assign(j, { fx: r * Math.cos(t), fy: ((k % 3) - 1) * 20, fz: r * Math.sin(t) });
   });
 }
