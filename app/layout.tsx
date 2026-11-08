@@ -18,7 +18,8 @@ export const metadata: Metadata = {
   description: "The tech skills Canadian companies are hiring for right now, from real job posts.",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+// `drawer` is the @drawer slot: the Learning guide slides up there when opened from inside the app.
+export default function RootLayout({ children, drawer }: LayoutProps<"/">) {
   return (
     <html
       lang="en"
@@ -27,6 +28,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <body className="min-h-full flex flex-col">
         <SiteHeader />
         <div className="relative mx-auto w-full max-w-[1600px] flex-1 px-4 pt-[72px] pb-6">{children}</div>
+        {drawer}
       </body>
     </html>
   );
