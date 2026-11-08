@@ -61,7 +61,7 @@ async function saveJobs(b: BoardRow, feed: FeedJob[]): Promise<number> {
 
   const [company] = await sql<{ id: number }[]>`
     insert into companies (name, ats, board) values (${b.name ?? b.board}, ${b.ats}, ${b.board})
-    on conflict (ats, board) do update set name = excluded.name
+    on conflict (ats, board) do update set name = coalesce(${b.name}, companies.name) -- unnamed board: keep the name already there
     returning id`;
   const rows = keep.map(({ j, loc }) => ({
     id: `${b.ats}:${b.board}:${j.externalId}`, company_id: company.id, title: j.title, location: j.location,
