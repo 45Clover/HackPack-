@@ -3,6 +3,7 @@ import { auth0, authReady } from "@/lib/auth0";
 import { getNotifications, getProfile } from "@/lib/dashboard";
 import { buttonVariants } from "@/components/ui/button";
 import { NavMenu, NotificationsMenu, UserMenu } from "@/components/header-menus";
+import { EditProfileDialog } from "@/components/profile/edit-profile";
 
 // Top bar: [menu] HackPack ............ [notifications] [profile]
 export async function SiteHeader() {
@@ -27,6 +28,8 @@ export async function SiteHeader() {
           )}
         </div>
       </nav>
+      {/* Closed until something calls openEditProfile(); it loads your answers when it opens. */}
+      <EditProfileDialog />
     </header>
   );
 }
