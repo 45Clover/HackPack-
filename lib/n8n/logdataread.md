@@ -86,7 +86,8 @@ npx tsx --env-file=.env.local lib/n8n/trigger-ingest.ts https://<live-url>     #
 ## Choices worth knowing
 
 - **No AI in the ingest call** (plan v2.1). Gemini reads new jobs through `/api/extract`, so calling ingest twice costs no quota.
-- **Then `POST /api/extract?batch=8`** (added by Tomi): one Gemini call on the 8 newest unread jobs (Calgary first). Same Header Auth credential as ingest. **Once per morning, no retry, no loop:** each call is 1 of our 20 Gemini calls a day. 8 jobs keeps it under Vercel's 60 s limit even when Gemini is slow. Bigger catch-ups run from a laptop: `/api/extract` with no `?batch` does 20.
+- **Then `POST /api/extract?batch=5`, three times in a row** (added by Tomi): each is one Gemini call on the next 5 unread jobs (Calgary first), so 15 jobs and 3 Gemini calls per morning. Same Header Auth credential as ingest. No retry, no loop. Each call has its own 60 s on Vercel; 8 jobs in one call ran past Gemini's deadline live (504), 5 fits. If nothing is unread, a call returns `{ extracted: 0 }` without calling Gemini.
+- **Big catch-ups run from a laptop**, not from n8n: `/api/extract` with no `?batch` reads 20 jobs per call and has no time limit, so the same pile costs 4× fewer Gemini calls.
 - **Calling twice is safe:** boards fetched in the last 20 h are skipped, jobs are `on conflict do nothing`, and discovery
   continues where it was.
 - **Timezone is `America/Edmonton`** in the workflow settings, so 6:00 means Alberta time, not UTC.
