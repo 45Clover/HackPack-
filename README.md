@@ -111,7 +111,7 @@ flowchart LR
 
 The product works end to end. Next, we make it work for everyone:
 
-1. **Accessibility.** A full WCAG 2.2 AA pass: keyboard and screen-reader testing on every page, a text version of the 3D map, and contrast checks on every colour.
+1. **Accessibility.** A full WCAG 2.2 AA pass: keyboard and screen-reader testing on every page, keyboard controls for the 3D map, and contrast checks on every colour.
 2. **Every post read.** Gemini finishes reading the whole backlog, so every job gets a match score.
 3. **Internships.** More internship and co-op sources, since so few of today's posts are junior.
 4. **Career centres.** Bring Skilltrii to campus career centres and newcomer agencies.
