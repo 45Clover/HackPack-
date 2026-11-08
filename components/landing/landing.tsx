@@ -11,7 +11,7 @@ import { SkillIcon } from "@/components/dashboard/icons";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { HeroMap } from "./hero-map";
-import { HeroShader } from "./hero-shader";
+import { Format, Hub, Rebuild } from "@lucasmarkes/hairline/react";
 import { SmoothScroll } from "./smooth-scroll";
 import { Rise } from "./rise";
 
@@ -49,9 +49,12 @@ export async function Landing({ searchParams }: { searchParams: SearchParams }) 
   return (
     <Rise className="mx-auto flex w-full max-w-[1200px] flex-col gap-20 pb-10 lg:gap-28">
       <SmoothScroll />
-      {/* 1. Hero: the promise on the left, the real map turning on the right, over a slow shader gradient. */}
+      {/* 1. Hero: the promise on the left, the real map turning on the right, on plain paper. */}
       <section className="relative isolate grid min-h-[calc(100svh-72px)] items-center gap-8 py-10 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-12 lg:py-12">
-        <HeroShader />
+        {/* Full bleed, from under the header to the hero's bottom edge, where it fades into the page. */}
+        <div aria-hidden className="scene-bg pointer-events-none absolute -top-[72px] bottom-0 left-1/2 -z-10 w-screen -translate-x-1/2">
+          <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-b from-transparent to-[#f4f3ef]" />
+        </div>
         <div className="flex min-w-0 flex-col items-start gap-6">
           <Badge data-reveal variant="outline" className="h-auto min-h-7 gap-2 bg-white px-3 py-1 text-left text-[13px] font-normal whitespace-normal text-muted-foreground">
             <span aria-hidden className="size-1.5 rounded-full bg-[var(--blue)]" />
@@ -104,13 +107,16 @@ export async function Landing({ searchParams }: { searchParams: SearchParams }) 
       {/* 3. How it works. */}
       <section aria-labelledby="how" className="flex flex-col gap-8">
         <h2 id="how" data-reveal className="text-3xl font-semibold tracking-tight lg:text-4xl">How it works</h2>
-        <ol className="grid gap-4 lg:grid-cols-3">
+        {/* Each step has a Hairline figure (@lucasmarkes/hairline) that acts it out: a file read line by line, the jobs
+            around you, and one skill lifting everything that needs it. Decorative: the text says the same. */}
+        <ol className="hairline-warm grid gap-4 lg:grid-cols-3">
           {[
-            { title: "Tell us what you know", body: "Upload your resume or answer a few questions. The file is read in memory and never saved. No AI reads it.", tag: "Never saved" },
-            { title: "See the real jobs you're closest to", body: "Every job gets a match score from its must-have skills. You see what you already have and what's missing." },
-            { title: "Learn the next skill", body: "Its learning guide shows how demand has moved week by week, and the best free places to learn it." },
-          ].map((s, i) => (
+            { title: "Tell us what you know", body: "Upload your resume or answer a few questions. The file is read in memory and never saved. No AI reads it.", tag: "Never saved", Figure: Format },
+            { title: "See the real jobs you're closest to", body: "Every job gets a match score from its must-have skills. You see what you already have and what's missing.", Figure: Hub },
+            { title: "Learn the next skill", body: "Its learning guide shows how demand has moved week by week, and the best free places to learn it.", Figure: Rebuild },
+          ].map(({ Figure, ...s }, i) => (
             <li key={s.title} data-reveal className="surface flex flex-col gap-4 p-7">
+              <Figure play aria-hidden className="-mx-3 -mt-3" />
               <div className="flex items-center justify-between">
                 <span className="grid size-9 place-items-center rounded-full bg-[var(--ink)] text-sm font-semibold text-[#f4f3ef] tabular-nums">{i + 1}</span>
                 {s.tag && <Badge variant="secondary">{s.tag}</Badge>}

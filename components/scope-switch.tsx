@@ -5,10 +5,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import type { Scope } from "@/lib/scope";
 
 // The area switch: [your city | Canada] plus a city picker. State lives in the URL, so links can be shared.
-export function ScopeSwitch({ scope, cities }: { scope: Scope; cities: string[] }) {
+// `replace`: inside the Learning guide drawer, so closing it (one step back) still returns to the page beneath.
+export function ScopeSwitch({ scope, cities, replace = false }: { scope: Scope; cities: string[]; replace?: boolean }) {
   const router = useRouter();
   const pathname = usePathname();
-  const go = (kind: string, city: string) => router.push(`${pathname}?${new URLSearchParams({ scope: kind, city })}`);
+  const go = (kind: string, city: string) => router[replace ? "replace" : "push"](`${pathname}?${new URLSearchParams({ scope: kind, city })}`);
 
   return (
     <div className="flex flex-wrap items-center gap-2">

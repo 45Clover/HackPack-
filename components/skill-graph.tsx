@@ -31,6 +31,10 @@ export function SkillGraph({ edges }: { edges: Edge[] }) {
           const node = n as Node;
           if (node.kind === "skill") router.push(`/skills/${node.slug}`);
         }}
+        onNodeHover={(n) => {
+          const node = n as Node | null;
+          if (node?.kind === "skill") router.prefetch(`/skills/${node.slug}`); // the drawer opens on click
+        }}
         nodeCanvasObject={(n, ctx, scale) => {
           const node = n as Node;
           const r = node.kind === "skill" ? 5 : 8;
