@@ -1,4 +1,4 @@
--- Run in the Neon SQL editor after schema.sql (or: psql "$DATABASE_URL" -f db/005_boards.sql). Plain Postgres, no extensions.
+-- Run in the Neon SQL editor after schema.sql (or: psql "$DATABASE_URL" -f db/007_boards.sql). Plain Postgres, no extensions.
 -- Owner: Job data. The board list for ingest: which company feeds to fetch, and what discovery has found.
 -- v2.1: if not exists guards, so running it again is harmless. Does not change any table in schema.sql.
 
