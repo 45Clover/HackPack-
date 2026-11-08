@@ -1,16 +1,16 @@
 "use client";
 // /explore's list: every mapped job with its skills, filtered by job type and a search over title, company and skills.
-// The map above it (the landing's 3D map) draws the same filtered jobs, up to the newest 40 so it stays readable:
-// full screen width over the landing's shader, so the top of the page feels like the landing hero.
+// The map above it draws the same filtered jobs (the newest 40, so it stays readable) and behaves like the
+// dashboard's (explore-map.tsx), full screen width over the landing's shader.
 // Must-have skills come first and are solid; nice-to-haves are outlined. Each skill opens its Learning guide.
-import { useDeferredValue, useMemo, useState } from "react";
+import { useDeferredValue, useState } from "react";
 import Link from "next/link";
 import { ArrowUpRightIcon } from "lucide-react";
 import { ago } from "@/lib/ago";
 import { categoryColor } from "@/lib/categories";
 import { JOB_TYPES, type JobType } from "@/lib/roles";
 import { CompanyLogo } from "@/components/dashboard/icons";
-import { HeroMap } from "@/components/landing/hero-map";
+import { ExploreMap } from "./explore-map";
 import { HeroShader } from "@/components/landing/hero-shader";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -37,13 +37,6 @@ export function JobList({ jobs, intro }: { jobs: ListJob[]; intro: React.ReactNo
 
   // The map redraws from the filtered list; deferred so typing in the search box stays quick.
   const deferred = useDeferredValue(shown);
-  const graph = useMemo(() => {
-    const js = deferred.slice(0, GRAPH_JOBS);
-    return {
-      jobs: js.map((j) => ({ ...j, posted_at: new Date(j.posted_at), have: 0, needed: 0 })),
-      links: js.flatMap((j) => j.skills.map((s) => ({ job_id: j.id, skill_id: s.id, slug: s.slug, name: s.name, category: s.category, required: s.required, has: false }))),
-    };
-  }, [deferred]);
 
   return (
     <section aria-label="Mapped jobs" className="flex flex-col gap-4">
@@ -69,15 +62,15 @@ export function JobList({ jobs, intro }: { jobs: ListJob[]; intro: React.ReactNo
           <p role="status" className="text-sm text-muted-foreground tabular-nums sm:ml-auto">{shown.length} {shown.length === 1 ? "job" : "jobs"}</p>
         </div>
 
-        {/* Full screen width, most of its height. Job titles stay off the map (the list below names them). */}
+        {/* Full screen width, most of its height. Job titles show on hover or when picked, so 40 don't pile up. */}
         {shown.length > 0 && (
-          <figure className="relative left-1/2 flex w-screen -translate-x-1/2 flex-col gap-2 [&_.graph-label[data-kind=job]]:hidden">
+          <figure className="relative left-1/2 flex w-screen -translate-x-1/2 flex-col gap-3 [&_.graph-label[data-kind=job]:not([data-focus])]:hidden">
             <div className="h-[64svh] min-h-[420px] lg:h-[80svh]">
-              <HeroMap refit jobs={graph.jobs} links={graph.links} className="[mask-image:radial-gradient(ellipse_at_center,black_60%,transparent_100%)]" />
+              <ExploreMap jobs={deferred.slice(0, GRAPH_JOBS)} />
             </div>
-            <figcaption className="mx-auto max-w-[calc(100%-32px)] px-2 text-xs leading-relaxed text-muted-foreground lg:pointer-events-none lg:absolute lg:bottom-6 lg:left-1/2 lg:-translate-x-1/2 lg:rounded-full lg:bg-white lg:px-3.5 lg:py-1.5 lg:shadow-sm">
+            <figcaption className="mx-auto max-w-[calc(100%-32px)] px-2 text-center text-xs leading-relaxed text-muted-foreground">
               {shown.length > GRAPH_JOBS ? `The ${GRAPH_JOBS} newest of these jobs` : shown.length === 1 ? "This job" : `These ${shown.length} jobs`}{" "}
-              (<span className="text-foreground">diamonds</span>) and the skills they ask for (<span className="text-foreground">rings</span>). Click a skill to open its guide.
+              (<span className="text-foreground">diamonds</span>) and the skills they ask for, round the ring by category. Click any of them to focus it.
             </figcaption>
           </figure>
         )}

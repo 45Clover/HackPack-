@@ -2,11 +2,15 @@
 // drawn flat, and a headline. Hidden on phones, where the right half is the whole screen.
 // `children` swaps the flat drawing for a live one (onboarding draws your answers there).
 import { categoryColor } from "@/lib/categories";
+import { LogoMark } from "@/components/logo-mark";
 
 export function BrandPanel({ title, note, children }: { title: string; note?: string; children?: React.ReactNode }) {
   return (
     <aside className="relative hidden flex-col overflow-hidden bg-[var(--ink)] p-10 text-[#f4f3ef] md:flex">
-      <span className="relative z-10 text-[15px] font-semibold tracking-tight">Skilltrii</span>
+      <span className="relative z-10 flex items-center gap-2 text-[15px] font-semibold tracking-tight">
+        <LogoMark className="size-6" />
+        Skilltrii
+      </span>
       {children ?? <Constellation />}
       <div className="relative z-10 mt-auto max-w-md">
         <p className="text-4xl font-semibold leading-[1.1] tracking-tight">{title}</p>
