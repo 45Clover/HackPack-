@@ -39,6 +39,9 @@ export async function POST(request: Request) {
   let extracted = 0;
   for (const job of results) {
     await sql.begin(async (tx) => {
+      // Gemini's answer REPLACES any earlier skills for this job (e.g. the seed script's
+      // keyword guesses). Inside the transaction, so a failure undoes this delete too.
+      await tx`delete from job_skills where job_id = ${job.id}`;
       for (const raw of job.skills) {
         const skill = canonicalSkill(raw.name); // "ReactJS" → { slug: "react", name: "React" }
         if (!skill) continue;
