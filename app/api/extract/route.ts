@@ -1,11 +1,15 @@
 // Owner: AI (@tomi-alo). POST /api/extract: n8n calls this after /api/ingest.
 // One request = ONE Gemini call on up to 20 unread jobs (Calgary first, newest first).
 // Returns { extracted, remaining }. Call it again while remaining > 0 (and quota is left).
+//
+// Optional ?batch=N (1-20, default 20) = how many jobs go into that one call.
+// - Laptop catch-ups: no ?batch → 20 jobs (no time limit on a laptop).
+// - n8n on Vercel: ?batch=8 → stays under Vercel's 60 s limit even when Gemini is slow.
 import { sql } from "@/lib/db";
-import { extractSkillsBatch, MAX_BATCH } from "@/lib/extract";
+import { batchSize, extractSkillsBatch } from "@/lib/extract";
 import { canonicalSkill } from "@/lib/skills";
 
-export const maxDuration = 60; // seconds; one Gemini call on 20 jobs takes ~10-30 s
+export const maxDuration = 60; // seconds (Vercel's limit). 20 jobs took 36 s normally, up to 225 s when Gemini was overloaded
 
 type Todo = { id: string; title: string; description: string; posted_at: Date };
 
@@ -21,7 +25,7 @@ export async function POST(request: Request) {
     select id, title, description, posted_at from jobs
     where not extracted
     order by (city = 'Calgary') desc nulls last, posted_at desc
-    limit ${MAX_BATCH}`;
+    limit ${batchSize(request.url)}`;
   if (todo.length === 0) return Response.json({ extracted: 0, remaining: 0 });
 
   // 2. ONE Gemini call for the whole batch.

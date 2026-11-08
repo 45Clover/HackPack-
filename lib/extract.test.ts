@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { cleanResults } from "./extract";
+import { batchSize, cleanResults } from "./extract";
 
 const jobs = [
   { id: "a", title: "Dev", description: "" },
@@ -41,4 +41,14 @@ test("unknown seniority becomes 'unknown'", () => {
 
 test("empty or missing output gives no results", () => {
   assert.deepEqual(cleanResults(jobs, {}), []);
+});
+
+test("?batch= picks the batch size, anything odd falls back to 20", () => {
+  const u = (q: string) => `http://localhost:3000/api/extract${q}`;
+  assert.equal(batchSize(u("")), 20);
+  assert.equal(batchSize(u("?batch=8")), 8);
+  assert.equal(batchSize(u("?batch=0")), 20);
+  assert.equal(batchSize(u("?batch=500")), 20);
+  assert.equal(batchSize(u("?batch=abc")), 20);
+  assert.equal(batchSize(u("?batch=2.5")), 20);
 });
