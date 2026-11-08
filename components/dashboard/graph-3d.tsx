@@ -40,6 +40,7 @@ type Props = {
   hidden: Set<string>; // categories filtered out
   selectedId: string | null;
   onSelect: (node: GNode | null) => void;
+  onHover?: (node: GNode | null) => void;
   hoverId: string | null; // a row hovered in the sidebar: light up that node and its neighbours
   mini: (n: GNode) => ReactNode; // small card for each neighbour of the selected node
   width: number;
@@ -68,7 +69,7 @@ const MIN_D = 90, MAX_D = 1250;
 const distanceToZoom = (d: number) => Math.min(100, Math.max(0, (100 * Math.log(MAX_D / d)) / Math.log(MAX_D / MIN_D)));
 const zoomToDistance = (v: number) => MAX_D * Math.pow(MIN_D / MAX_D, v / 100);
 
-export default function Graph3D({ zoom, onZoom, orbit, data, have, learning, hidden, selectedId, onSelect, hoverId, mini, width, height, autoRotate }: Props) {
+export default function Graph3D({ zoom, onZoom, orbit, data, have, learning, hidden, selectedId, onSelect, onHover, hoverId, mini, width, height, autoRotate }: Props) {
   const fg = useRef<ForceGraphMethods<GNode, GLink> | undefined>(undefined);
   const labels = useRef(new Map<string, CSS2DObject>());
   const groups = useRef(new Map<string, THREE.Group>());
@@ -318,8 +319,9 @@ export default function Graph3D({ zoom, onZoom, orbit, data, have, learning, hid
     (n: GNode | null) => {
       document.body.style.cursor = n ? "pointer" : "";
       paintLabels(n?.id ?? hoverId ?? selectedId);
+      onHover?.(n);
     },
-    [paintLabels, hoverId, selectedId],
+    [paintLabels, hoverId, selectedId, onHover],
   );
   const onBackgroundClick = useCallback(() => onSelect(null), [onSelect]);
 
