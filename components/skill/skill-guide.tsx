@@ -69,8 +69,11 @@ export async function SkillGuide({ slug, searchParams, inDrawer = false }: { slu
   const resources = [...extras.resources.map((r) => ({ ...r, kind: "Guide" as const })), ...resourcesFor(skill)]
     .filter((r, i, all) => all.findIndex((x) => x.url === r.url) === i);
 
+  // In the drawer a skeleton in the same shape already holds the space, so the guide just replaces it. The page's
+  // staggered entrance there blanked the skeleton and trickled the cards back in for 2 s, which read as a glitch.
+  const Root = inDrawer ? "div" : Reveal;
   return (
-    <Reveal className={`mx-auto max-w-6xl space-y-8 pb-16 ${inDrawer ? "pt-2" : "pt-4"}`}>
+    <Root className={`mx-auto max-w-6xl space-y-8 pb-16 ${inDrawer ? "pt-2" : "pt-4"}`}>
       {!inDrawer && (
         <Link data-reveal href="/" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground">
           <ArrowLeftIcon className="size-4" />Your skill map
@@ -87,7 +90,7 @@ export async function SkillGuide({ slug, searchParams, inDrawer = false }: { slu
             <h1 className="text-5xl leading-tight font-medium tracking-tight">{skill.name}</h1>
           </div>
         </div>
-        <ScopeSwitch scope={scope} cities={cities} />
+        <ScopeSwitch scope={scope} cities={cities} replace={inDrawer} />
       </header>
 
       <p data-reveal className="max-w-2xl text-lg text-muted-foreground">
@@ -159,6 +162,7 @@ export async function SkillGuide({ slug, searchParams, inDrawer = false }: { slu
               <Link
                 key={r.slug}
                 href={`/skills/${r.slug}`}
+                replace={inDrawer} // the drawer closes with one step back, so it keeps one history entry
                 className="inline-flex items-center gap-1.5 rounded-full border border-border bg-white px-3 py-1.5 text-[13px] transition-[transform,background-color] duration-150 hover:bg-secondary active:scale-[0.97]"
               >
                 <span style={{ color: categoryColor(r.category) }}><SkillIcon slug={r.slug} category={r.category} /></span>
@@ -229,6 +233,6 @@ export async function SkillGuide({ slug, searchParams, inDrawer = false }: { slu
           ))}
         </section>
       )}
-    </Reveal>
+    </Root>
   );
 }

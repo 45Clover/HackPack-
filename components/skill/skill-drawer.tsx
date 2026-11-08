@@ -1,63 +1,46 @@
 "use client";
-// The bottom drawer the Learning guide opens in: 87% of the screen tall, 90% wide, scrolls inside.
-// Motion (GSAP), like a native sheet: it rises from below the screen while the page behind is pushed back (scales
-// down, rounds its corners, a dark backdrop shows around it). Closing drops it away faster than it came in, the page
-// springs back, then we go back in history so the URL returns to where you were.
-import { useCallback, useEffect, useRef } from "react";
-import { useRouter } from "next/navigation";
-import gsap from "gsap";
+// The bottom drawer the Learning guide opens in: 87% of the screen tall, 90% wide, scrolls inside. It's the layout of
+// the intercepted route (app/@drawer/(.)skills), above a loading.tsx, so Next prefetches it with the link: the drawer
+// opens on click and the guide streams in behind a skeleton.
+// Motion is CSS (@starting-style to rise in, since Base UI skips its enter styles for a dialog that mounts open, and
+// Base UI's ending style to drop away), not GSAP: transform transitions run on the compositor, so React
+// mounting the guide can't stall them. Like a native sheet, it rises from below while the page behind is pushed back
+// (globals.css, html[data-drawer]); closing drops it away faster, then we go back in history so the URL returns.
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 
-const calm = () => !matchMedia("(prefers-reduced-motion: reduce)").matches;
-const shell = () => document.getElementById("app-shell");
-// Pushing the page back means transforming it, which re-anchors its fixed panels: only safe when it isn't scrolled.
-const canPush = () => window.scrollY < 4;
-const restore = () => {
-  const s = shell();
-  if (s) gsap.set(s, { clearProps: "transform,borderRadius,overflow" });
-  gsap.set(document.body, { clearProps: "backgroundColor" });
-};
+const html = () => document.documentElement;
 
-export function SkillDrawer({ title, children }: { title: string; children: React.ReactNode }) {
+export function SkillDrawer({ children }: { children: React.ReactNode }) {
   const router = useRouter();
-  const panel = useRef<HTMLDivElement | null>(null);
-  const entered = useRef(false);
-  const closing = useRef(false);
+  const { slug } = useParams<{ slug: string }>();
+  const [open, setOpen] = useState(true);
+  const panel = useRef<HTMLDivElement>(null);
 
-  // The sheet mounts a moment after this component (it renders into a portal), so start the motion when it does:
-  // the drawer rises and the page is pushed back in the same beat.
-  const enter = useCallback((el: HTMLDivElement | null) => {
-    panel.current = el;
-    if (!el || entered.current || !calm()) return;
-    entered.current = true;
-    gsap.fromTo(el, { yPercent: 100 }, { yPercent: 0, duration: 0.6, ease: "expo.out" });
-    const s = shell();
-    if (!s || !canPush()) return;
-    gsap.set(document.body, { backgroundColor: "#141413" });
-    gsap.to(s, { scale: 0.94, y: 10, borderRadius: 28, overflow: "hidden", transformOrigin: "50% 0%", duration: 0.6, ease: "expo.out" });
+  // Pushing the page back means transforming it, which re-anchors its fixed panels: only safe when it isn't scrolled.
+  useLayoutEffect(() => {
+    if (window.scrollY < 4 && !matchMedia("(prefers-reduced-motion: reduce)").matches) html().dataset.drawer = "push";
+    return () => void delete html().dataset.drawer; // if we leave some other way, never leave the page pushed back
   }, []);
+  useEffect(() => panel.current?.scrollTo(0, 0), [slug]); // a "learn next" link swaps the guide inside the open drawer
 
-  useEffect(() => restore, []); // if we leave some other way, never leave the page pushed back
-
-  const close = () => {
-    if (closing.current) return;
-    closing.current = true;
-    if (!calm()) return void (restore(), router.back());
-    const s = shell();
-    if (s && gsap.getProperty(s, "scale") !== 1) gsap.to(s, { scale: 1, y: 0, borderRadius: 0, duration: 0.3, ease: "power3.in", onComplete: restore });
-    gsap.to(panel.current, { yPercent: 100, duration: 0.3, ease: "power3.in", onComplete: () => router.back() });
+  const close = (next: boolean) => {
+    if (next) return;
+    setOpen(false);
+    if (html().dataset.drawer) html().dataset.drawer = "back"; // the page springs back while the drawer drops
   };
 
   return (
-    <Sheet open onOpenChange={(open) => !open && close()}>
+    <Sheet open={open} onOpenChange={close} onOpenChangeComplete={(o) => !o && router.back()}>
       <SheetContent
-        ref={enter}
+        ref={panel}
         side="bottom"
-        // GSAP owns the slide: the sheet's CSS transition and Base UI's small slide/fade are off, or they re-ease every
-        // frame GSAP sets and the drawer barely moves.
-        className="transition-none data-[side=bottom]:h-[87svh] gap-0 overflow-y-auto overscroll-contain rounded-t-[2rem] border-0 bg-background px-4 pt-10 shadow-[0_-24px_60px_-30px_rgb(20_20_19/0.45)] sm:px-8 data-[side=bottom]:inset-x-[5vw] data-[side=bottom]:data-starting-style:translate-y-0 data-[side=bottom]:data-ending-style:translate-y-0 data-starting-style:opacity-100 data-ending-style:opacity-100"
+        // No backdrop blur: blurring the whole page every frame while it scales is what the GPU chokes on.
+        overlayClassName="supports-backdrop-filter:backdrop-blur-none"
+        className="transition-transform duration-400 ease-[cubic-bezier(0.32,0.72,0,1)] data-ending-style:duration-250 motion-reduce:transition-none data-[side=bottom]:h-[87svh] gap-0 overflow-y-auto overscroll-contain rounded-t-[2rem] border-0 bg-background px-4 pt-10 shadow-[0_-24px_60px_-30px_rgb(20_20_19/0.45)] sm:px-8 data-[side=bottom]:inset-x-[5vw] data-[side=bottom]:starting:translate-y-full data-[side=bottom]:data-ending-style:translate-y-full data-starting-style:opacity-100 data-ending-style:opacity-100"
       >
-        <SheetTitle className="sr-only">{title}</SheetTitle>
+        <SheetTitle className="sr-only">{`${slug} learning guide`}</SheetTitle>
         <span aria-hidden className="absolute top-3 left-1/2 h-1.5 w-12 -translate-x-1/2 rounded-full bg-foreground/15" />
         {children}
       </SheetContent>
