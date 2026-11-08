@@ -15,7 +15,6 @@ import { Format, Hub, Rebuild } from "@lucasmarkes/hairline/react";
 import { HeroShader } from "./hero-shader";
 import { SmoothScroll } from "./smooth-scroll";
 import { Rise } from "./rise";
-import { WaitlistForm } from "@/components/waitlist/waitlist-form";
 
 type SearchParams = Record<string, string | string[] | undefined>;
 type Stats = { jobs: number; internships: number; companies: number; skills: number; newest: Date | null; area: number };
@@ -25,7 +24,7 @@ const cta = buttonVariants({ className: "h-11 gap-2 px-5 text-[15px] active:scal
 export async function Landing({ searchParams }: { searchParams: SearchParams }) {
   // All of Canada by default; ?city=… or ?scope=city&city=… still picks one city.
   const { scope, note } = await resolveScope({ scope: searchParams.city ? "city" : "canada", ...searchParams });
-  const [map, [stats], [waitlist]] = await Promise.all([
+  const [map, [stats], [members]] = await Promise.all([
     getDashboardFor([], scope, null), // no skills yet: the 15 newest jobs in the area and the skills they ask for
     sql<Stats[]>`
       select count(*)::int as jobs,
@@ -36,7 +35,7 @@ export async function Landing({ searchParams }: { searchParams: SearchParams }) 
              count(*) filter (where ${inScope(scope)})::int as area
       from jobs j where j.posted_at > now() - interval '60 days'
         and exists (select 1 from job_skills js where js.job_id = j.id)`, // only jobs whose skills we've read: what the map can draw
-    sql<{ count: number }[]>`select count(*)::int as count from waitlist`,
+    sql<{ count: number }[]>`select count(*)::int as count from profiles`, // everyone who signed up
   ]);
 
   const where = scope.kind === "canada" ? "Canada" : scope.city;
@@ -76,7 +75,10 @@ export async function Landing({ searchParams }: { searchParams: SearchParams }) 
               Sign in
             </Link>
           </div>
-          <p data-reveal className="text-sm text-muted-foreground">Free. No sign-up to see your map. Your resume is never saved.</p>
+          <p data-reveal className="text-sm text-muted-foreground">
+            <span className="font-medium text-foreground tabular-nums">{members.count.toLocaleString("en-CA")}</span>{" "}
+            {members.count === 1 ? "person has" : "people have"} signed up. Free, no sign-up to see your map, and your resume is never saved.
+          </p>
           {note && <p className="text-sm text-muted-foreground">{note}</p>}
         </div>
 
@@ -165,23 +167,7 @@ export async function Landing({ searchParams }: { searchParams: SearchParams }) 
         </section>
       )}
 
-      {/* 5. Pre-registration (db/010). The count shows from 10 people up: fewer reads as empty. */}
-      <section aria-labelledby="early" className="grid items-start gap-8 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-12">
-        <div className="flex flex-col gap-4 lg:pt-6">
-          <h2 id="early" data-reveal className="text-3xl font-semibold tracking-tight text-balance lg:text-4xl">Get early access</h2>
-          <p data-reveal className="max-w-[44ch] leading-relaxed text-muted-foreground">
-            Skilltrii is in beta, built at Hack the Change 2026, and internships are coming. Join to hear the day it opens.
-          </p>
-          {waitlist.count >= 10 && (
-            <p data-reveal className="text-sm text-muted-foreground tabular-nums">{waitlist.count.toLocaleString("en-CA")} people have joined</p>
-          )}
-        </div>
-        <div data-reveal className="surface p-7">
-          <WaitlistForm source="landing" />
-        </div>
-      </section>
-
-      {/* 6. The same one action, once more. */}
+      {/* 5. The same one action, once more. */}
       <section data-reveal className="surface-ink flex flex-col items-center gap-6 px-6 py-16 text-center lg:py-20">
         <h2 className="max-w-[20ch] text-3xl font-semibold tracking-tight text-balance lg:text-5xl">See the jobs you&apos;re closest to.</h2>
         <p className="max-w-[46ch] leading-relaxed text-[#f4f3ef]/70">
