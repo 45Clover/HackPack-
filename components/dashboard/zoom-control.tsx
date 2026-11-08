@@ -4,12 +4,14 @@
 import { useRef } from "react";
 import gsap from "gsap";
 import { MinusIcon, PlusIcon, SearchIcon } from "lucide-react";
+import { cn } from "cn";
 import { Slider } from "@/components/ui/slider";
 
 const OPEN = 240, SHUT = 44;
 const calm = () => !matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-export function ZoomControl({ value, onChange }: { value: number; onChange: (v: number) => void }) {
+// `className` places it somewhere else, e.g. inside /explore's map instead of the dashboard's screen edge.
+export function ZoomControl({ value, onChange, className }: { value: number; onChange: (v: number) => void; className?: string }) {
   const box = useRef<HTMLDivElement>(null);
   const open = (on: boolean) => {
     const el = box.current;
@@ -34,7 +36,7 @@ export function ZoomControl({ value, onChange }: { value: number; onChange: (v: 
       onMouseLeave={() => open(false)}
       onFocus={() => open(true)}
       onBlur={(e) => { if (!box.current?.contains(e.relatedTarget as Node | null)) open(false); }}
-      className="surface pointer-events-auto fixed top-1/2 z-20 hidden w-11 -translate-y-1/2 overflow-hidden rounded-full lg:right-[calc(clamp(270px,19.8vw,350px)+16px)] lg:block"
+      className={cn("surface pointer-events-auto fixed top-1/2 z-20 hidden w-11 -translate-y-1/2 overflow-hidden rounded-full lg:right-[calc(clamp(270px,19.8vw,350px)+16px)] lg:block", className)}
       style={{ height: SHUT }}
     >
       <SearchIcon data-icon aria-hidden className="absolute top-1/2 left-1/2 size-4 -translate-x-1/2 -translate-y-1/2 text-muted-foreground" />
