@@ -1,7 +1,7 @@
 // Sends the same request n8n sends every morning, so /api/ingest can be tested without n8n.
 // Run: npx tsx --env-file=.env.local logdata/trigger-ingest.ts [baseUrl]
 // baseUrl defaults to APP_BASE_URL, then http://localhost:3000.
-// Each successful call spends 1 Gemini call (extractLimit: 1), so don't loop it.
+// No Gemini here, and boards fetched in the last 20 h are skipped, so running it twice is safe.
 
 async function main() {
   const base = process.argv[2] ?? process.env.APP_BASE_URL ?? "http://localhost:3000";
