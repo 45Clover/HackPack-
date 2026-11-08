@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { batchSize, cleanResults, shouldTryNextModel } from "./extract";
+import { attemptTimeout, batchSize, cleanResults, shouldTryNextModel } from "./extract";
 
 const jobs = [
   { id: "a", title: "Dev", description: "" },
@@ -65,4 +65,13 @@ test("falls back to the next model on quota, overload or timeout, not on real er
 test("falls back when Google's deadline expires (504), as seen live on Vercel", () => {
   assert.equal(shouldTryNextModel({ status: 504 }), true);
   assert.equal(shouldTryNextModel(new Error('{"error":{"code":504,"message":"Deadline expired before operation could complete.","status":"DEADLINE_EXCEEDED"}}')), true);
+});
+
+test("each model gets up to 25 s, but never more than what's left of the 55 s total", () => {
+  const vercel = { timeoutMs: 25_000, totalMs: 55_000 };
+  assert.equal(attemptTimeout(0, 0, vercel), 25_000);       // first model: full 25 s
+  assert.equal(attemptTimeout(0, 1_000, vercel), 25_000);   // previous model failed fast: still 25 s
+  assert.equal(attemptTimeout(0, 40_000, vercel), 15_000);  // previous models were slow: only 15 s left
+  assert.equal(attemptTimeout(0, 52_000, vercel), null);    // under 5 s left: don't start another model
+  assert.equal(attemptTimeout(0, 999_999, {}), undefined);  // laptop: no limit
 });
