@@ -1,5 +1,6 @@
 # logdata: daily refresh with n8n (T8)
 
+<<<<<<< HEAD
 n8n makes **one** call a day. It doesn't loop, pick batches or know about discovery. The server decides all of that,
 so the n8n workflow never has to change when the board list grows or a schedule changes.
 
@@ -10,12 +11,22 @@ n8n Schedule Trigger (6:00 Alberta time)
               1. daily fetch   lib/ingest.ts    every call: due boards, 100 per batch, longest-waiting first
               2. discovery     lib/discover.ts  only if due (lib/schedule.ts): Keenable weekly, Common Crawl monthly
               3. check         lib/discover.ts  found boards → boards table, if the feed works and has a Canadian tech job
+=======
+n8n calls our ingest endpoint once a day, so the skill map stays fresh with no server of our own.
+
+```
+n8n Schedule Trigger (6:00 Alberta time)
+  └─> POST https://<live-url>/api/ingest   header: x-ingest-secret
+        └─> lib/ingest.ts: fetch feeds → keep Canadian tech jobs → save → Gemini reads new jobs (1 call)
+              └─> {"jobs": …, "extracted": …}
+>>>>>>> 2f748f257b8f7c37b6adfce2b5f5797bff0d1823
 ```
 
 | File | What it is |
 |---|---|
 | `n8n-daily-ingest.json` | Workflow to import into n8n Cloud. Holds **no secret** (the repo is public). |
 | `trigger-ingest.ts` | Sends the same request from your laptop, to test the endpoint without n8n. |
+<<<<<<< HEAD
 | `../lib/schedule.ts` | **The schedule.** How often each discovery source runs. Change it here, not in n8n. |
 | `../lib/daily.ts` | What one call does, and how the 40 s are split. |
 | `../db/005_boards.sql` | The `boards`, `board_candidates` and `discovery_runs` tables + the 19 starting boards. |
@@ -69,6 +80,23 @@ npx tsx --env-file=.env.local scripts/discover.ts commoncrawl 30     # 30 minute
 npx tsx --env-file=.env.local scripts/discover.ts check 20           # candidates → boards
 ```
 
+=======
+
+## Set it up (about 5 minutes)
+
+Needs: `/api/ingest` deployed (T2), and `INGEST_SECRET` set in Vercel → Settings → Environment Variables.
+
+1. **Import.** n8n Cloud → *Create workflow* → **⋯ → Import from File** → pick `logdata/n8n-daily-ingest.json`.
+2. **URL.** Open the **POST /api/ingest** node and replace `REPLACE-WITH-LIVE-URL` with the Vercel URL (or our domain once T8 step 2 is done).
+3. **Secret.** In the same node, under *Credential for Header Auth* → **Create new credential**:
+   - Name: `x-ingest-secret`
+   - Value: the `INGEST_SECRET` from the team's private chat
+   
+   n8n stores this encrypted. Never paste it into the workflow JSON, a commit or an issue.
+4. **Test.** Click **Execute workflow**. The output should look like `{"jobs": 312, "extracted": 20}`. Screenshot it for the pitch.
+5. **Turn on.** Flip the **Active** toggle (top right). Check **Executions** the next morning.
+
+>>>>>>> 2f748f257b8f7c37b6adfce2b5f5797bff0d1823
 ## Test from your laptop
 
 ```bash
@@ -78,6 +106,7 @@ npx tsx --env-file=.env.local logdata/trigger-ingest.ts https://<live-url>     #
 
 | Response | Meaning |
 |---|---|
+<<<<<<< HEAD
 | `200 {"fetched":…}` | Working |
 | `403 Forbidden` | Secret in n8n / `.env.local` doesn't match Vercel's `INGEST_SECRET` |
 | `404` | Route not deployed yet, or wrong URL |
@@ -91,3 +120,16 @@ npx tsx --env-file=.env.local logdata/trigger-ingest.ts https://<live-url>     #
 - **Timezone is `America/Edmonton`** in the workflow settings, so 6:00 means Alberta time, not UTC.
 - **Timeout is 90 s** in n8n. The server stops itself at 40 s (`maxDuration` is 60 s), so n8n always gets an answer.
 - **Backup if n8n is cut** (cut order in the hub issue): run `trigger-ingest.ts` by hand before the demo.
+=======
+| `200 {"jobs":…,"extracted":…}` | Working |
+| `403 Forbidden` | Secret in n8n / `.env.local` doesn't match Vercel's `INGEST_SECRET` |
+| `404` | Route not deployed yet (T2), or wrong URL |
+| timeout | Ingest ran past Vercel's 60 s limit. Fewer feeds per run, or check the Vercel logs |
+
+## Choices worth knowing
+
+- **Once a day, no automatic retry.** Every call spends Gemini quota (`extractLimit: 1`), and the free tier is tight. A retry after a timeout could spend it twice. If a run fails, run it again by hand.
+- **Timezone is `America/Edmonton`** in the workflow settings, so 6:00 means Alberta time, not UTC.
+- **Timeout is 90 s** in n8n, longer than Vercel's 60 s `maxDuration`, so n8n reports Vercel's real error rather than its own timeout.
+- **Backup if n8n is cut** (cut order in the hub issue): run `scripts/ingest.ts` by hand before the demo.
+>>>>>>> 2f748f257b8f7c37b6adfce2b5f5797bff0d1823
