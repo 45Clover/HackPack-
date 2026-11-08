@@ -15,7 +15,7 @@ export default async function Explore() {
     sql<ListJob[]>`
       select j.id, j.title, j.url, c.name as company, j.city, j.remote, j.posted_at::text as posted_at,
              ${isInternship()} as internship,
-             json_agg(json_build_object('slug', s.slug, 'name', s.name, 'category', s.category, 'required', js.required)
+             json_agg(json_build_object('id', s.id, 'slug', s.slug, 'name', s.name, 'category', s.category, 'required', js.required)
                       order by js.required desc, s.name) as skills
       from jobs j
       join companies c on c.id = j.company_id
