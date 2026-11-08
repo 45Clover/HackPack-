@@ -207,10 +207,17 @@ export function DashboardShell({ user, role, scope, cities, mine, jobs, links, l
   const root = useRef<HTMLDivElement>(null);
   const layer = useRef<HTMLDivElement>(null); // the 3D map / tree backdrop
   const treeBox = useRef<HTMLDivElement>(null);
-  // Phones: the cards and the map are two screens side by side; swipe, or use the switch at the bottom.
+  // Phones: the cards and the view (3D map, Match or Skill tree) are two screens side by side; swipe, or use the switch at the bottom.
   const pager = useRef<HTMLDivElement>(null);
+  const info = useRef<HTMLElement>(null); // the right panel (leaderboard, or the selected node's info)
   const [pane, setPane] = useState(0);
   const showPane = (i: number) => pager.current?.scrollTo({ left: i * pager.current.clientWidth, behavior: "smooth" });
+  // A tap in Match or the Skill tree. On phones its info is on the cards screen, so go there.
+  const pick = (id: string) => {
+    select(id);
+    // Next frame, once the info has replaced the leaderboard (the old, shorter panel would cut the scroll short).
+    if (!matchMedia("(min-width: 64rem)").matches) requestAnimationFrame(() => info.current?.scrollIntoView({ behavior: calm() ? "smooth" : "auto", block: "start", inline: "start" }));
+  };
 
   // Entrance: panels slide in from the edges they're docked to. `.enter` starts them hidden (with a CSS fallback reveal);
   // once they're in, the class comes off so later GSAP fades (like the category bar's) aren't overridden by it.
@@ -308,9 +315,9 @@ export function DashboardShell({ user, role, scope, cities, mine, jobs, links, l
         </div>
       </div>
 
-      {/* 2D view: jobs ↔ skills (Saagii's canvas), in the space between the panels. */}
+      {/* 2D view: jobs ↔ skills (Saagii's canvas), in the space between the panels. Phones: the second screen. */}
       {view === "match" && (
-        <div ref={treeBox} className="relative z-[5] overflow-auto lg:fixed lg:top-[132px] lg:right-[calc(clamp(270px,19.8vw,350px)+16px)] lg:bottom-[78px] lg:left-[calc(clamp(250px,18.6vw,330px)+16px)]">
+        <div ref={treeBox} className={`fixed inset-x-0 top-[72px] bottom-[76px] z-[5] overflow-auto lg:top-[132px] lg:right-[calc(clamp(270px,19.8vw,350px)+16px)] lg:bottom-[78px] lg:left-[calc(clamp(250px,18.6vw,330px)+16px)] ${pane === 0 ? "max-lg:invisible" : ""}`}>
           <MatchView
             jobs={jobs}
             links={links}
@@ -319,15 +326,15 @@ export function DashboardShell({ user, role, scope, cities, mine, jobs, links, l
             matchOf={matchOf}
             focusId={hoverId ?? selected?.id ?? null}
             onHover={setHoverId}
-            onSelect={select}
+            onSelect={pick}
             scale={scale(zoom.match)}
           />
         </div>
       )}
 
-      {/* 2D view: the skill tree, in the space between the panels. */}
+      {/* 2D view: the skill tree, in the space between the panels. Phones: the second screen. */}
       {view === "tree" && (
-        <div ref={treeBox} className="relative z-[5] flex flex-col-reverse overflow-auto lg:fixed lg:top-[132px] lg:right-[calc(clamp(270px,19.8vw,350px)+16px)] lg:bottom-[78px] lg:left-[calc(clamp(250px,18.6vw,330px)+16px)]">
+        <div ref={treeBox} className={`fixed inset-x-0 top-[72px] bottom-[76px] z-[5] flex flex-col-reverse overflow-auto lg:top-[132px] lg:right-[calc(clamp(270px,19.8vw,350px)+16px)] lg:bottom-[78px] lg:left-[calc(clamp(250px,18.6vw,330px)+16px)] ${pane === 0 ? "max-lg:invisible" : ""}`}>
           <SkillTree
             skills={[...skills.values()]}
             have={have}
@@ -336,21 +343,22 @@ export function DashboardShell({ user, role, scope, cities, mine, jobs, links, l
             jobCount={jobCount}
             nextSlug={nextSkill?.skill.slug ?? null}
             selectedSlug={selectedSkill?.slug ?? null}
-            onSelect={(slug) => select(`s:${slug}`)}
+            onSelect={(slug) => pick(`s:${slug}`)}
             scale={scale(zoom.tree)}
           />
         </div>
       )}
 
-      {/* Phones: two screens side by side, the cards and then the map (it's the fixed layer behind, so the second
-          screen is see-through). Swipe on the cards, or use the switch at the bottom. Desktop: unchanged. */}
+      {/* Phones: two screens side by side, the cards and then the view (the map, Match or Skill tree sits behind, so the
+          second screen is see-through). Swipe on the cards, or use the switch at the bottom. Desktop: unchanged. */}
       <div
         ref={pager}
         onScroll={(e) => setPane(Math.round(e.currentTarget.scrollLeft / e.currentTarget.clientWidth))}
         className="pointer-events-none fixed inset-0 z-10 flex snap-x snap-mandatory overflow-x-auto overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:contents"
       >
-      {/* Mobile: the panels stack (the first screen). Desktop: they slide out from the screen edges (Saagii's mockup). */}
-      <div className="pointer-events-none relative z-10 flex h-full w-full shrink-0 snap-start flex-col gap-4 overflow-y-auto px-4 pt-[72px] pb-24 lg:contents">
+      {/* Mobile: the panels stack (the first screen), and the whole screen scrolls, gaps included. Desktop: they slide out
+          from the screen edges (Saagii's mockup). */}
+      <div className="pointer-events-auto relative z-10 flex h-full w-full shrink-0 snap-start flex-col gap-4 overflow-y-auto px-4 pt-[72px] pb-24 lg:pointer-events-none lg:contents">
         {/* LEFT: the student card (collapsible) and the black Learning card (always there). No cards inside cards. */}
         <div data-enter="left" className="enter flex flex-col gap-4 lg:fixed lg:top-[122px] lg:bottom-0 lg:left-0 lg:w-[clamp(250px,18.6vw,330px)] lg:gap-[30px]">
         <div className={`relative min-h-0 flex-1 lg:transition-transform lg:duration-500 lg:ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none ${leftOpen ? "" : "lg:-translate-x-full"}`}>
@@ -517,7 +525,7 @@ export function DashboardShell({ user, role, scope, cities, mine, jobs, links, l
         </div>
 
         {/* RIGHT: leaderboard / closest jobs, or "overall info" for the selected node */}
-        <aside data-enter="right" className="enter surface pointer-events-auto flex flex-col gap-5 overflow-y-auto p-6 lg:fixed lg:top-[122px] lg:right-0 lg:bottom-0 lg:w-[clamp(270px,19.8vw,350px)] lg:rounded-none lg:rounded-tl-[40px] lg:pb-24">
+        <aside ref={info} data-enter="right" className="enter surface pointer-events-auto flex shrink-0 scroll-mt-[72px] scroll-ml-4 flex-col gap-5 overflow-y-auto p-6 lg:fixed lg:top-[122px] lg:right-0 lg:bottom-0 lg:w-[clamp(270px,19.8vw,350px)] lg:rounded-none lg:rounded-tl-[40px] lg:pb-24">
           <div className="flex items-center justify-between gap-2">
             {selected ? (
               <button className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground" onClick={() => setSelected(null)}>
@@ -648,16 +656,19 @@ export function DashboardShell({ user, role, scope, cities, mine, jobs, links, l
       </div>
 
       <div role="group" aria-label="Show" className="surface fixed bottom-5 left-1/2 z-30 flex -translate-x-1/2 rounded-full p-1 lg:hidden">
-        {["Cards", "Map"].map((label, i) => (
-          <button
-            key={label}
-            aria-pressed={pane === i}
-            onClick={() => showPane(i)}
-            className={`rounded-full px-4 py-1.5 text-sm transition-colors ${pane === i ? "bg-[var(--ink)] text-white" : "text-muted-foreground"}`}
-          >
-            {label}
-          </button>
-        ))}
+        {([["Cards", null], ["Map", "map"], ["Match", "match"], ["Tree", "tree"]] as const).map(([label, v]) => {
+          const on = v ? pane === 1 && view === v : pane === 0;
+          return (
+            <button
+              key={label}
+              aria-pressed={on}
+              onClick={() => { if (v) switchView(v); showPane(v ? 1 : 0); }}
+              className={`rounded-full px-3.5 py-1.5 text-sm transition-colors ${on ? "bg-[var(--ink)] text-white" : "text-muted-foreground"}`}
+            >
+              {label}
+            </button>
+          );
+        })}
       </div>
     </div>
   );
