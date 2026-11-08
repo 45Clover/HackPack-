@@ -1,49 +1,40 @@
-import { sql } from "@/lib/db";
-import { inScope, resolveScope } from "@/lib/scope";
-import { ScopeSwitch } from "@/components/scope-switch";
-import { SkillGraph, type Edge } from "@/components/skill-graph";
-import { SkillTable, type SkillRow } from "@/components/skill-table";
+import { redirect } from "next/navigation";
+import { auth0, authReady } from "@/lib/auth0";
+import { getDashboard, getProfile, getSavedAndStarted } from "@/lib/dashboard";
+import { resolveScope } from "@/lib/scope";
+import { roleBySlug } from "@/lib/roles";
+import { PublicMap } from "@/components/public-map";
+import { DashboardShell } from "@/components/dashboard/dashboard-shell";
 
+// Signed out → the public map. Signed in without a profile → onboarding. Otherwise → your dashboard.
 export default async function Home({ searchParams }: PageProps<"/">) {
-  const { scope, cities, note } = await resolveScope(await searchParams);
+  const sp = await searchParams;
+  const session = authReady ? await auth0.getSession() : null;
+  if (!session) return <PublicMap searchParams={sp} />;
 
-  const skills = await sql<(SkillRow & { id: number })[]>`
-    select s.id, s.slug, s.name, count(distinct js.job_id)::int as jobs,
-           count(distinct j.company_id)::int as companies, max(js.posted_at) as latest
-    from job_skills js
-    join skills s on s.id = js.skill_id
-    join jobs j on j.id = js.job_id
-    where js.posted_at > now() - interval '60 days' and ${inScope(scope)}
-    group by s.id order by jobs desc limit 40`;
+  const profile = await getProfile(session.user.sub);
+  if (!profile) redirect("/onboarding");
 
-  const edges = await sql<Edge[]>`
-    select c.name as company, s.slug, s.name as skill, count(*)::int as jobs
-    from job_skills js
-    join skills s on s.id = js.skill_id
-    join jobs j on j.id = js.job_id
-    join companies c on c.id = j.company_id
-    where js.posted_at > now() - interval '60 days' and ${inScope(scope)}
-      and s.id = any(${skills.slice(0, 25).map((s) => s.id)}::int[])
-    group by c.name, s.slug, s.name`;
+  // Your saved city is the default; the URL switch (?scope=…&city=…) still overrides it.
+  const { scope, cities } = await resolveScope({ city: profile.city ?? undefined, ...sp });
+  const [data, mineLists] = await Promise.all([
+    getDashboard(session.user.sub, scope, profile.target_role),
+    getSavedAndStarted(session.user.sub),
+  ]);
 
-  const where = scope.kind === "canada" ? "Canadian" : scope.city;
   return (
-    <main className="space-y-8">
-      <div className="space-y-3">
-        <h1 className="text-3xl font-semibold tracking-tight">What tech skills {where} companies are hiring for right now</h1>
-        {/* People + pitch adds the StatCan headline number here */}
-        <ScopeSwitch scope={scope} cities={cities} />
-        {note && <p className="text-sm text-muted-foreground">{note}</p>}
-      </div>
-      {skills.length === 0 ? (
-        <p className="text-muted-foreground">No skills yet. They appear once the ingest script has run.</p>
-      ) : (
-        <>
-          {/* Spread: postgres.js returns an array with extra props; client components need a plain array. */}
-          <SkillGraph edges={[...edges]} />
-          <SkillTable skills={[...skills]} />
-        </>
-      )}
-    </main>
+    <DashboardShell
+      user={{ name: session.user.name ?? "You", picture: session.user.picture ?? null }}
+      role={roleBySlug(profile.target_role).name}
+      scope={scope}
+      cities={cities}
+      mine={data.mine}
+      jobs={data.jobs}
+      links={data.links}
+      leaders={data.leaders}
+      saved={mineLists.saved}
+      started={mineLists.started}
+      persist
+    />
   );
 }
