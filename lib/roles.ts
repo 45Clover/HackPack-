@@ -16,3 +16,24 @@ export const ROLES = [
 export const roleBySlug = (slug: string | null | undefined) => ROLES.find((r) => r.slug === slug) ?? ROLES[0];
 // ?role=… from the URL (the dashboard's role filter), if it's a real role; otherwise the fallback (the saved one).
 export const roleFrom = (v: unknown, fallback: string | null) => (typeof v === "string" && ROLES.some((r) => r.slug === v) ? v : fallback);
+
+// What a student is looking for (profiles.looking_for, db/009) and the dashboard's job-type filter (?type=).
+export const LOOKING_FOR = [
+  { value: "internship", label: "Internship or co-op" },
+  { value: "full_time", label: "Full-time job" },
+  { value: "both", label: "Both" },
+] as const;
+export type LookingFor = (typeof LOOKING_FOR)[number]["value"];
+export const lookingForFrom = (v: unknown): LookingFor => (LOOKING_FOR.some((l) => l.value === v) ? (v as LookingFor) : "both");
+
+export const JOB_TYPES = [
+  { value: "all", label: "All jobs" },
+  { value: "internship", label: "Internships" },
+  { value: "full_time", label: "Full-time" },
+] as const;
+export type JobType = (typeof JOB_TYPES)[number]["value"];
+// ?type= wins; otherwise what you're looking for ("both" = all jobs).
+export const jobTypeFrom = (v: unknown, lookingFor?: string | null): JobType => {
+  const t = typeof v === "string" ? v : lookingFor;
+  return t === "internship" || t === "full_time" ? t : "all";
+};

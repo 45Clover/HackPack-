@@ -30,7 +30,7 @@ export function NavMenu({ signedIn }: { signedIn: boolean }) {
   );
 }
 
-type Note = { title: string; url: string; company: string; posted_at: Date };
+type Note = { title: string; url: string; company: string; posted_at: Date; internship: boolean };
 
 export function NotificationsMenu({ items }: { items: Note[] }) {
   return (
@@ -50,7 +50,7 @@ export function NotificationsMenu({ items }: { items: Note[] }) {
         {items.map((n) => (
           <DropdownMenuItem key={n.url} onClick={() => window.open(n.url, "_blank", "noopener")} className="flex-col items-start gap-0">
             <span className="font-medium">{n.title}</span>
-            <span className="text-xs text-muted-foreground">{n.company} · {ago(n.posted_at)}</span>
+            <span className="text-xs text-muted-foreground">{n.internship && "Internship · "}{n.company} · {ago(n.posted_at)}</span>
           </DropdownMenuItem>
         ))}
       </DropdownMenuContent>
