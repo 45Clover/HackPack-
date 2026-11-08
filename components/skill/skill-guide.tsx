@@ -6,6 +6,7 @@ import { notFound } from "next/navigation";
 import { ArrowLeftIcon, ArrowUpRightIcon, TrendingDownIcon, TrendingUpIcon } from "lucide-react";
 import { sql } from "@/lib/db";
 import { getExtras } from "@/lib/extras";
+import { getImpactProjects } from "@/lib/impact";
 import { resourcesFor } from "@/lib/resources";
 import { inScope, resolveScope } from "@/lib/scope";
 import { ago } from "@/lib/ago";
@@ -13,6 +14,7 @@ import { CATEGORIES, categoryColor } from "@/lib/categories";
 import { ScopeSwitch } from "@/components/scope-switch";
 import { DemandChart } from "@/components/skill/demand-chart";
 import { Reveal } from "@/components/skill/reveal";
+import { ImpactProjects } from "@/components/skill/impact-projects";
 import { CompanyLogo, SiteIcon, SkillIcon } from "@/components/dashboard/icons";
 import { Badge } from "@/components/ui/badge";
 
@@ -27,7 +29,7 @@ export async function SkillGuide({ slug, searchParams, inDrawer = false }: { slu
   const { scope, cities, note } = await resolveScope(searchParams);
   const area = inScope(scope);
 
-  const [jobs, companies, weeks, related, learners, stories, extras] = await Promise.all([
+  const [jobs, companies, weeks, related, learners, stories, extras, impact] = await Promise.all([
     sql<{ title: string; url: string; posted_at: Date; company: string; city: string | null; remote: boolean }[]>`
       select j.title, j.url, j.posted_at, c.name as company, j.city, j.remote
       from job_skills js join jobs j on j.id = js.job_id join companies c on c.id = j.company_id
@@ -55,6 +57,7 @@ export async function SkillGuide({ slug, searchParams, inDrawer = false }: { slu
     sql<{ person: string; role: string | null; company: string | null; quote: string }[]>`
       select person, role, company, quote from stories where skill_id = ${skill.id}`,
     getExtras(skill),
+    getImpactProjects(skill.id), // [] until db/008 is applied and the generate script has run
   ]);
 
   const total = companies.reduce((n, c) => n + c.jobs, 0);
@@ -166,6 +169,9 @@ export async function SkillGuide({ slug, searchParams, inDrawer = false }: { slu
           </div>
         </section>
       </div>
+
+      {/* A real Canadian problem, from public data, to build something for while learning it. Renders nothing yet. */}
+      <ImpactProjects projects={impact} skill={skill.name} />
 
       <section aria-labelledby="resources" className="space-y-5 pt-4">
         <div data-reveal>
