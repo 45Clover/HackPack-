@@ -18,13 +18,15 @@ export default async function Home({ searchParams }: PageProps<"/">) {
   if (guest) {
     const { scope, cities } = await resolveScope({ city: guest.city ?? undefined, ...sp });
     const mine = await sql<MySkill[]>`select id, slug, name, category from skills where id = any(${guest.skillIds}::int[]) order by name`;
-    const roleSlug = roleFrom(sp.role, guest.role); // the filter menu can look at another role
+    const roleSlug = roleFrom(sp.role, "any"); // every role by default; the left panel's button narrows to theirs
     const data = await getDashboardFor([...mine], scope, roleSlug);
     return (
       <DashboardShell
         user={{ name: "Guest", picture: null }}
         role={roleBySlug(roleSlug).name}
         roleSlug={roleSlug ?? undefined}
+        myRole={guest.role}
+        layout={sp.layout === "force" ? "force" : undefined}
         scope={scope}
         cities={cities}
         mine={data.mine}
@@ -45,7 +47,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
 
   // Your saved city is the default; the URL switch (?scope=…&city=…) still overrides it.
   const { scope, cities } = await resolveScope({ city: profile.city ?? undefined, ...sp });
-  const roleSlug = roleFrom(sp.role, profile.target_role); // ?role= from the filter menu; your saved role stays saved
+  const roleSlug = roleFrom(sp.role, "any"); // every role by default; the left panel's button narrows to your saved role
   const [data, mineLists] = await Promise.all([
     getDashboard(session.user.sub, scope, roleSlug),
     getSavedAndStarted(session.user.sub),
@@ -56,6 +58,8 @@ export default async function Home({ searchParams }: PageProps<"/">) {
       user={{ name: session.user.name ?? "You", picture: session.user.picture ?? null }}
       role={roleBySlug(roleSlug).name}
       roleSlug={roleSlug ?? undefined}
+      myRole={profile.target_role}
+      layout={sp.layout === "force" ? "force" : undefined}
       scope={scope}
       cities={cities}
       mine={data.mine}

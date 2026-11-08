@@ -77,9 +77,22 @@ export default function Graph3D({ zoom, onZoom, orbit, data, have, learning, hid
   const settling = useRef(true); // the force layout is still moving
   const spinning = useRef(false); // autoRotate is on, so the scene never sleeps
   const reduced = useMemo(() => typeof window !== "undefined" && matchMedia("(prefers-reduced-motion: reduce)").matches, []);
+  const labelsDirty = useRef(true); // a label changed (shown, hidden, retitled, added), so place them again
   const css2d = useMemo(() => {
     const r = new CSS2DRenderer();
     r.domElement.style.pointerEvents = "none"; // labels never block clicks; the card turns them back on
+    // Performance: placing ~50 DOM labels every frame was most of the map's cost (hovering felt stuck). Only place them
+    // when the camera moved, the layout is still settling, or a label changed.
+    // eslint-disable-next-line react-hooks/refs -- this runs inside the 3D render loop, never during a React render
+    const place = r.render.bind(r);
+    let last = "";
+    r.render = (scene, camera) => {
+      const view = camera.matrixWorld.elements.join(",") + camera.projectionMatrix.elements.join(",");
+      if (view === last && !settling.current && !labelsDirty.current) return;
+      last = view;
+      labelsDirty.current = false;
+      place(scene, camera);
+    };
     return r;
   }, []);
   const textures = useMemo(() => ({ ring: ringTexture() }), []);
@@ -102,6 +115,7 @@ export default function Graph3D({ zoom, onZoom, orbit, data, have, learning, hid
   // Labels: well-connected skills, and whatever you hover or select (plus their neighbours).
   const paintLabels = useCallback(
     (focus: string | null) => {
+      labelsDirty.current = true;
       const near = focus ? neighbours.get(focus) : null;
       for (const [id, obj] of labels.current) {
         const degree = neighbours.get(id)?.size ?? 0;
@@ -271,7 +285,43 @@ export default function Graph3D({ zoom, onZoom, orbit, data, have, learning, hid
   }, [wake, hidden, have, learning, selectedId]);
 
   const near = useMemo(() => (selectedId ? neighbours.get(selectedId) ?? new Set<string>() : null), [selectedId, neighbours]);
-  const inFocus = (id: string) => !selectedId || id === selectedId || !!near?.has(id);
+  // Everything handed to ForceGraph3D keeps its identity between renders. A new function on every render made
+  // force-graph restart its engine each time; each restart "finished" by re-fitting the camera, whose zoom report
+  // re-rendered the dashboard: a loop that kept the map busy and slow to answer the cursor.
+  const fitted = useRef(false); // the first time the layout settles, fit the camera; later stops don't move it
+  const onEngineStop = useCallback(() => {
+    settling.current = false;
+    if (fitted.current || selectedRef.current) return;
+    fitted.current = true;
+    flyTo(0.9, 140);
+  }, [flyTo]);
+  const nodeVisibility = useCallback(
+    (n: GNode) => (n.kind !== "skill" || !hidden.has(n.category ?? "")) && (!selectedId || n.id === selectedId || !!near?.has(n.id)),
+    [hidden, selectedId, near],
+  );
+  const linkVisibility = useCallback(
+    (l: GLink) => {
+      const t = typeof l.target === "string" ? null : l.target;
+      const ends = !selectedId || idOf(l.source) === selectedId || idOf(l.target) === selectedId;
+      return ends && (!t || t.kind !== "skill" || !hidden.has(t.category ?? ""));
+    },
+    [hidden, selectedId],
+  );
+  const linkColor = useCallback(
+    (l: GLink) => {
+      if (hoverId && idOf(l.source) !== hoverId && idOf(l.target) !== hoverId) return "#e6e3dc"; // faded while you hover a row
+      return l.kind === "has" ? "#9c988f" : "#cfcbc2";
+    },
+    [hoverId],
+  );
+  const onNodeHover = useCallback(
+    (n: GNode | null) => {
+      document.body.style.cursor = n ? "pointer" : "";
+      paintLabels(n?.id ?? hoverId ?? selectedId);
+    },
+    [paintLabels, hoverId, selectedId],
+  );
+  const onBackgroundClick = useCallback(() => onSelect(null), [onSelect]);
 
   // Up to 6 neighbours of the selected node get their own small card (your second sketch); more would pile up.
   const miniHosts = useMemo(() => {
@@ -323,6 +373,7 @@ export default function Graph3D({ zoom, onZoom, orbit, data, have, learning, hid
       if (n) pinned.push([new CSS2DObject(host), n]);
     }
     for (const [obj] of pinned) graph.scene().add(obj);
+    labelsDirty.current = true;
     let raf = 0;
     const follow = () => {
       for (const [obj, n] of pinned) obj.position.set(n.x ?? 0, n.y ?? 0, n.z ?? 0);
@@ -384,6 +435,7 @@ export default function Graph3D({ zoom, onZoom, orbit, data, have, learning, hid
       group.add(label);
       labels.current.set(n.id, label);
       groups.current.set(n.id, group);
+      labelsDirty.current = true;
       queueMicrotask(() => paintLabels(selectedRef.current));
       return group;
     },
@@ -403,30 +455,16 @@ export default function Graph3D({ zoom, onZoom, orbit, data, have, learning, hid
         extraRenderers={[css2d] as never} // CSS2DRenderer works here; three types and 3d-force-graph types disagree
         cooldownTicks={180}
         warmupTicks={30}
-        onEngineStop={() => {
-          settling.current = false;
-          if (!selectedId) flyTo(0.9, 140);
-        }}
-        nodeVisibility={(n) => (n.kind !== "skill" || !hidden.has(n.category ?? "")) && inFocus(n.id)}
-        linkVisibility={(l) => {
-          const t = typeof l.target === "string" ? null : l.target;
-          const ends = !selectedId || idOf(l.source) === selectedId || idOf(l.target) === selectedId;
-          return ends && (!t || t.kind !== "skill" || !hidden.has(t.category ?? ""));
-        }}
-        linkColor={(l) => {
-          const focus = hoverId;
-          if (focus && idOf(l.source) !== focus && idOf(l.target) !== focus) return "#e6e3dc"; // faded while you hover a row
-          return l.kind === "has" ? "#9c988f" : "#cfcbc2";
-        }}
+        onEngineStop={onEngineStop}
+        nodeVisibility={nodeVisibility}
+        linkVisibility={linkVisibility}
+        linkColor={linkColor}
         linkOpacity={0.6}
         linkWidth={0}
         linkCurvature={0.22}
-        onNodeHover={(n) => {
-          document.body.style.cursor = n ? "pointer" : "";
-          paintLabels(n?.id ?? hoverId ?? selectedId);
-        }}
-        onNodeClick={(n) => onSelect(n)}
-        onBackgroundClick={() => onSelect(null)}
+        onNodeHover={onNodeHover}
+        onNodeClick={onSelect}
+        onBackgroundClick={onBackgroundClick}
         nodeThreeObject={nodeObject}
       />
       {[...miniHosts].map(([id, host], i) => {

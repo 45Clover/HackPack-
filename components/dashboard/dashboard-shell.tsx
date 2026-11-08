@@ -10,7 +10,7 @@ import { useGSAP } from "@gsap/react";
 import Lenis from "lenis";
 import {
   ArrowLeftIcon, ArrowUpRightIcon, BookmarkIcon, BookmarkCheckIcon, CheckIcon, ChevronLeftIcon, ChevronRightIcon, SlidersHorizontalIcon,
-  TrendingDownIcon, TrendingUpIcon, XIcon,
+  LayersIcon, TargetIcon, TrendingDownIcon, TrendingUpIcon, XIcon,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -65,11 +65,12 @@ type Props = {
   initialFocus?: string; // e.g. "s:react" or "j:<job id>": open with that node selected
   initialSidebarOpen?: boolean;
   initialView?: View;
-  layout?: "orbit"; // preview of the donut-shaped 3D map (?layout=orbit)
+  layout?: "force"; // the 3D map is a donut (orbit) by default; ?layout=force brings back the free-floating layout
+  myRole?: string | null; // the role they picked in onboarding: the left panel's button narrows the map to it
   guest?: boolean; // a guest's own map (from the onboarding cookie): show "Save your map"
 };
 
-export function DashboardShell({ user, role, scope, cities, mine, jobs, links, leaders, saved: initialSaved, started, persist, roleSlug, initialFocus, initialSidebarOpen = true, initialView = "map", layout, guest }: Props) {
+export function DashboardShell({ user, role, scope, cities, mine, jobs, links, leaders, saved: initialSaved, started, persist, roleSlug, initialFocus, initialSidebarOpen = true, initialView = "map", layout, guest, myRole }: Props) {
   const router = useRouter();
   const skills = useMemo(() => {
     const m = new Map<string, Skill>();
@@ -87,9 +88,11 @@ export function DashboardShell({ user, role, scope, cities, mine, jobs, links, l
   const [leftOpen, setLeftOpen] = useState(initialSidebarOpen);
   const [currentSlug, setCurrentSlug] = useState<string | null>(null);
   const [view, setView] = useState<View>(initialView);
+  const hasMyRole = !!myRole && myRole !== "any";
   // Zoom slider per view, 0–100. The 3D map reports its own (null until its first camera move); 40 = 100% in the 2D views.
   const [zoom, setZoom] = useState<Record<View, number | null>>({ map: null, match: 40, tree: 40 });
-  const setMapZoom = useCallback((v: number) => setZoom((z) => ({ ...z, map: v })), []);
+  // Ignore tiny moves, so a camera that settles doesn't re-render the whole dashboard over and over.
+  const setMapZoom = useCallback((v: number) => setZoom((z) => (z.map !== null && Math.abs(z.map - v) < 0.5 ? z : { ...z, map: v })), []);
   const scale = (v: number | null) => 0.6 + (v ?? 40) / 100; // 0.6×–1.6×
   const [hoverId, setHoverId] = useState<string | null>(null);
   const [hidden, setHidden] = useState<Set<string>>(new Set());
@@ -104,7 +107,7 @@ export function DashboardShell({ user, role, scope, cities, mine, jobs, links, l
       if (!nodes.has(`s:${l.slug}`)) nodes.set(`s:${l.slug}`, { id: `s:${l.slug}`, kind: "skill", label: l.name, slug: l.slug, category: l.category });
       edges.push({ source: `j:${l.job_id}`, target: `s:${l.slug}`, kind: l.has ? "has" : "missing" });
     }
-    if (layout === "orbit") orbitLayout([...nodes.values()], edges);
+    if (layout !== "force") orbitLayout([...nodes.values()], edges);
     return { nodes: [...nodes.values()], links: edges };
   }, [jobs, links, layout]);
 
@@ -291,7 +294,7 @@ export function DashboardShell({ user, role, scope, cities, mine, jobs, links, l
         <div ref={layer} className="absolute inset-0">
           {view === "map" && (
           <GraphBoundary>
-            <Graph3D zoom={zoom.map} onZoom={setMapZoom} orbit={layout === "orbit"} data={data} have={have} learning={learning} hidden={hidden} selectedId={selected?.id ?? null} onSelect={setSelected} hoverId={hoverId} mini={mini} width={width} height={height} />
+            <Graph3D zoom={zoom.map} onZoom={setMapZoom} orbit={layout !== "force"} data={data} have={have} learning={learning} hidden={hidden} selectedId={selected?.id ?? null} onSelect={setSelected} hoverId={hoverId} mini={mini} width={width} height={height} />
           </GraphBoundary>
           )}
           {view === "tree" && <TreeBackdrop />}
@@ -345,9 +348,22 @@ export function DashboardShell({ user, role, scope, cities, mine, jobs, links, l
             </Avatar>
             <div className="min-w-0">
               <p className="text-2xl leading-tight font-medium tracking-tight break-words">{user.name}</p>
-              <p className="mt-0.5 text-sm text-muted-foreground">{role} · {scope.kind === "canada" ? "Canada" : scope.city}</p>
+              <p className="mt-0.5 text-sm text-muted-foreground">{hasMyRole ? roleBySlug(myRole).name : role} · {scope.kind === "canada" ? "Canada" : scope.city}</p>
             </div>
           </div>
+          {/* The map shows every role by default; this narrows it to the role they picked (and back). */}
+          {hasMyRole && (
+            <Button
+              variant="secondary"
+              size="sm"
+              aria-pressed={roleSlug === myRole}
+              disabled={filtering}
+              onClick={() => setFilters({ role: roleSlug === myRole ? "any" : myRole! })}
+              className="-mt-2 self-start rounded-full active:scale-[0.97]"
+            >
+              {roleSlug === myRole ? <><LayersIcon />Show all roles</> : <><TargetIcon />Show {roleBySlug(myRole).name} jobs</>}
+            </Button>
+          )}
 
           <dl className="flex justify-between border-y border-border py-4">
             {([["Skills", have.size], ["Saved", saved.length], ["Started", learning.size]] as const).map(([label, n]) => (
