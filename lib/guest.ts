@@ -1,7 +1,8 @@
 // Owner: UI (@SaagiiSG). Onboarding answers: a guest's live in the `hp_guest` cookie (nothing in the database)
 // until they sign in and claim them. Signed-in answers go straight to Neon, with the name and email from sign-in (db/006).
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { sql } from "./db";
+import { getProfile } from "./dashboard";
 import { ROLES } from "./roles";
 
 export type Answers = { skillIds: number[]; role: string; city: string | null };
@@ -28,6 +29,33 @@ export function parseGuest(raw: string | undefined): Answers | null {
   } catch {
     return null;
   }
+}
+
+export type Skill = { id: number; slug: string; name: string; category: string | null };
+export type AnswersForm = { skills: Skill[]; cities: string[]; initial: { skillIds: number[]; role: string; city: string } };
+
+// What the onboarding page and the Edit profile dialog start from: every skill (most asked for first), the cities with
+// jobs, and your answers so far (signed in: Neon; a guest: the cookie). No city yet: Vercel's IP guess, never stored
+// unless you confirm it.
+export async function getAnswersForm(sub: string | null): Promise<AnswersForm> {
+  const [profile, mine, guest, skills, cities, ipCity] = await Promise.all([
+    sub ? getProfile(sub) : null,
+    sub ? sql<{ id: number }[]>`select skill_id as id from user_skills where user_sub = ${sub} and status = 'have'` : [],
+    sub ? null : readGuest(),
+    sql<Skill[]>`
+      select s.id, s.slug, s.name, s.category from skills s
+      join job_skills js on js.skill_id = s.id group by s.id order by count(*) desc`,
+    sql<{ city: string }[]>`select city from jobs where city is not null group by city order by count(*) desc`,
+    headers().then((h) => h.get("x-vercel-ip-city")),
+  ]);
+  const guessCity = ipCity ? decodeURIComponent(ipCity) : "Calgary";
+  return {
+    skills: [...skills],
+    cities: cities.map((c) => c.city),
+    initial: sub
+      ? { skillIds: mine.map((m) => m.id), role: profile?.target_role ?? "any", city: profile?.city ?? guessCity }
+      : { skillIds: guest?.skillIds ?? [], role: guest?.role ?? "any", city: guest?.city ?? guessCity },
+  };
 }
 
 export async function readGuest() {

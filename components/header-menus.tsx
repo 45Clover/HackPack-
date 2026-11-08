@@ -3,11 +3,12 @@ import Link from "next/link";
 import { BellIcon, MenuIcon } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { Sheet, SheetClose, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ago } from "@/lib/ago";
+import { openEditProfile } from "@/components/profile/edit-profile";
 
 const icon = buttonVariants({ variant: "ghost", size: "icon" });
 const go = (href: string) => window.location.assign(href); // full load: Auth0 routes and fresh server data
@@ -21,7 +22,7 @@ export function NavMenu({ signedIn }: { signedIn: boolean }) {
         <nav className="flex flex-col gap-1 px-4 text-sm">
           <Link className="rounded-md px-2 py-1.5 hover:bg-muted" href="/">{signedIn ? "My dashboard" : "Home"}</Link>
           <Link className="rounded-md px-2 py-1.5 hover:bg-muted" href="/explore">Explore the skill map</Link>
-          {signedIn && <Link className="rounded-md px-2 py-1.5 hover:bg-muted" href="/onboarding">Edit my profile</Link>}
+          {signedIn && <SheetClose className="rounded-md px-2 py-1.5 text-left hover:bg-muted" onClick={openEditProfile}>Edit my profile</SheetClose>}
           <Link className="rounded-md px-2 py-1.5 hover:bg-muted" href="/about">How it works &amp; privacy</Link>
         </nav>
       </SheetContent>
@@ -75,7 +76,7 @@ export function UserMenu({ name, picture }: { name: string; picture: string | nu
       <DropdownMenuContent align="end" className="w-56">
         <DropdownMenuGroup><DropdownMenuLabel>{name}</DropdownMenuLabel></DropdownMenuGroup>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={() => go("/onboarding")}>Edit skills &amp; resume</DropdownMenuItem>
+        <DropdownMenuItem onClick={openEditProfile}>Edit skills &amp; resume</DropdownMenuItem>
         <DropdownMenuItem onClick={() => go("/about")}>Privacy</DropdownMenuItem>
         <DropdownMenuItem variant="destructive" onClick={deleteMyData}>Delete my data</DropdownMenuItem>
         <DropdownMenuSeparator />

@@ -1,6 +1,12 @@
 import { auth0, authReady } from "@/lib/auth0";
 import { sql } from "@/lib/db";
-import { answersFromBody, clearGuest, saveAnswers, writeGuest } from "@/lib/guest";
+import { answersFromBody, clearGuest, getAnswersForm, saveAnswers, writeGuest } from "@/lib/guest";
+
+// The Edit profile dialog's starting point: every skill, the cities, and your answers so far (or a guest's cookie).
+export async function GET() {
+  const session = authReady ? await auth0.getSession() : null;
+  return Response.json(await getAnswersForm(session?.user.sub ?? null));
+}
 
 // Save onboarding: the skills you have, your target role, your city.
 // Signed in → Neon (plus your name and email from sign-in). A guest → the hp_guest cookie only, until they sign in and claim it (/api/onboarding/claim).
