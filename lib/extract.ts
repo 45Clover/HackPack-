@@ -59,7 +59,8 @@ export function cleanResults(jobs: JobInput[], parsed: Partial<ExtractResult>): 
 // Shared by extract.ts and extras.ts: one throttled Gemini call that must return JSON
 // matching `schema`, with the model fallback on 429.
 export async function callGemini(input: string, systemInstruction: string, schema: unknown): Promise<string> {
-  ai ??= new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+  // v1beta: the "-latest" model aliases and responseJsonSchema only exist there, not on v1.
+  ai ??= new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY, apiVersion: "v1beta" });
 
   for (const model of MODELS) {
     // Throttle: wait until at least MIN_GAP_MS has passed since the last call.
@@ -80,14 +81,15 @@ export async function callGemini(input: string, systemInstruction: string, schem
       });
       return res.text ?? '{"jobs":[]}';
     } catch (err) {
-      // 429 = this model's quota is used up. Fall through to the next model.
-      // Anything else (bad key, bad request) is a real error, so stop.
-      if ((err as { status?: number }).status === 429) {
-        console.warn(`Gemini 429 on ${model}, trying the next model.`);
+      // 429 = this model's daily quota is used up. 503 = this model is overloaded right now.
+      // Either way, try the next model. Anything else (bad key, bad request) is a real error, so stop.
+      const status = (err as { status?: number }).status;
+      if (status === 429 || status === 503) {
+        console.warn(`Gemini ${status} on ${model}, trying the next model.`);
         continue;
       }
       throw err;
     }
   }
-  throw new Error("Gemini quota used up on every model. It resets at 1 AM Calgary time.");
+  throw new Error("Every Gemini model is out of quota (resets 1 AM Calgary) or overloaded. Try again later.");
 }
