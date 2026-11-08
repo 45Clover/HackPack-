@@ -8,6 +8,7 @@ test("a good body comes back clean", () => {
   assert.deepEqual(parseWaitlist(ok), ok);
   assert.deepEqual(parseWaitlist({ email: "ada@example.com", role: "employer" }), { email: "ada@example.com", role: "employer", internships: false, source: "landing" });
   assert.equal(parseWaitlist({ ...ok, source: "somewhere" })?.source, "landing");
+  assert.equal(parseWaitlist({ ...ok, source: "joinearly" })?.source, "joinearly");
 });
 
 test("email is trimmed and lowercased", () => {
