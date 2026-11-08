@@ -18,7 +18,7 @@ export function NavMenu({ signedIn }: { signedIn: boolean }) {
     <Sheet>
       <SheetTrigger className={icon} aria-label="Open menu"><MenuIcon /></SheetTrigger>
       <SheetContent side="left" className="w-64">
-        <SheetHeader><SheetTitle>Skilltri</SheetTitle></SheetHeader>
+        <SheetHeader><SheetTitle>Skilltrii</SheetTitle></SheetHeader>
         <nav className="flex flex-col gap-1 px-4 text-sm">
           <Link className="rounded-md px-2 py-1.5 hover:bg-muted" href="/">{signedIn ? "My dashboard" : "Home"}</Link>
           <Link className="rounded-md px-2 py-1.5 hover:bg-muted" href="/explore">Explore the skill map</Link>
@@ -61,7 +61,7 @@ export function NotificationsMenu({ items }: { items: Note[] }) {
 export function UserMenu({ name, picture }: { name: string; picture: string | null }) {
   const initials = name.split(/\s+/).map((w) => w[0]).join("").slice(0, 2).toUpperCase();
   async function deleteMyData() {
-    if (!confirm("Delete your skills and profile from Skilltri? This can't be undone.")) return;
+    if (!confirm("Delete your skills and profile from Skilltrii? This can't be undone.")) return;
     await fetch("/api/onboarding", { method: "DELETE" });
     go("/auth/logout");
   }
