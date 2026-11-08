@@ -169,6 +169,14 @@
   from { opacity: 0; transform: translateY(6px); }
   to { opacity: 1; transform: none; }
 }
+/* Lenis (smooth scrolling on the landing page): its recommended base rules. */
+html.lenis, html.lenis body { height: auto; }
+.lenis.lenis-smooth { scroll-behavior: auto !important; }
+.lenis.lenis-smooth [data-lenis-prevent] { overscroll-behavior: contain; }
+.lenis.lenis-stopped { overflow: hidden; }
+/* The landing hero's shader is full-bleed (100vw); clip, so it never adds a sideways scrollbar. */
+body { overflow-x: clip; }
+
 /* Panels the GSAP entrance reveals. If the script never runs, this CSS reveals them anyway after 2.5s. */
 .enter { opacity: 0; animation: enter-fallback 0.01s 2.5s forwards; }
 @keyframes enter-fallback { to { opacity: 1; } }

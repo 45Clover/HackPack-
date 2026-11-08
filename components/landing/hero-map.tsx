@@ -44,7 +44,6 @@ export function HeroMap({ jobs, links }: { jobs: GraphJob[]; links: GraphLink[] 
       ref={box}
       // The map has no box of its own: its edges fade out into the hero's shader gradient.
       className="pointer-events-none relative h-full w-full overflow-hidden [mask-image:radial-gradient(closest-side,black_70%,transparent)] lg:pointer-events-auto"
-      onWheelCapture={(e) => e.stopPropagation()}
     >
       {size.width > 0 && (
         <GraphBoundary>

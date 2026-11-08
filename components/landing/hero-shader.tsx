@@ -25,7 +25,9 @@ export function HeroShader() {
   }, []);
 
   return (
-    <div aria-hidden className="scene-bg pointer-events-none absolute inset-0 -z-10">
+    // Full bleed: the whole width of the window, from the very top (under the header) to the hero's bottom edge,
+    // where it fades into the page.
+    <div aria-hidden className="scene-bg pointer-events-none absolute -top-[72px] bottom-0 left-1/2 -z-10 w-screen -translate-x-1/2">
       {on && (
         <Shader
           disableTelemetry
@@ -38,6 +40,7 @@ export function HeroShader() {
           </FilmGrain>
         </Shader>
       )}
+      <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-b from-transparent to-[#f4f3ef]" />
     </div>
   );
 }
