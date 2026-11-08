@@ -89,6 +89,11 @@ export default function Graph3D({ zoom, onZoom, orbit, data, have, learning, hid
     const place = r.render.bind(r);
     let last = "";
     r.render = (scene, camera) => {
+      // A node the filter hides (bottom-bar category, selection) is taken out of the scene a frame after React
+      // renders, and placing only visits what's in the scene, so its label froze where it was. Hide those here.
+      for (const obj of labels.current.values()) {
+        if (!obj.parent?.parent && obj.element.style.display !== "none") obj.element.style.display = "none";
+      }
       const view = camera.matrixWorld.elements.join(",") + camera.projectionMatrix.elements.join(",");
       if (view === last && !settling.current && !labelsDirty.current) return;
       last = view;
