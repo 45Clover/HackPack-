@@ -15,7 +15,7 @@ export default function OnboardingPreview() {
       firstName="Sample"
       skills={DICT}
       cities={["Calgary", "Toronto", "Vancouver", "Edmonton"]}
-      initial={{ skillIds: DICT.filter((s) => ["React", "TypeScript", "Node.js"].includes(s.name)).map((s) => s.id), role: "any", city: "Calgary" }}
+      initial={{ skillIds: DICT.filter((s) => ["React", "TypeScript", "Node.js"].includes(s.name)).map((s) => s.id), role: "any", city: "Calgary", lookingFor: "both" }}
     />
   );
 }

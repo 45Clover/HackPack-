@@ -6,7 +6,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { FileUpIcon, XIcon } from "lucide-react";
 import type { AnswersForm, Skill } from "@/lib/guest";
 import { categoryColor } from "@/lib/categories";
-import { ROLES } from "@/lib/roles";
+import { LOOKING_FOR, ROLES, type LookingFor } from "@/lib/roles";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -67,6 +67,7 @@ function ProfileForm({ form: { skills, cities, initial } }: { form: AnswersForm 
   const [tab, setTab] = useState("hand");
   const [picked, setPicked] = useState(() => new Set(initial.skillIds));
   const [role, setRole] = useState(initial.role);
+  const [lookingFor, setLookingFor] = useState<LookingFor>(initial.lookingFor);
   const [city, setCity] = useState(initial.city);
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState({ busy: false, message: "" });
@@ -97,7 +98,7 @@ function ProfileForm({ form: { skills, cities, initial } }: { form: AnswersForm 
     const res = await fetch("/api/onboarding", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ skillIds: [...picked], targetRole: role, city }),
+      body: JSON.stringify({ skillIds: [...picked], targetRole: role, city, lookingFor }),
     }).catch(() => null);
     if (!res?.ok) return setStatus({ busy: false, message: "Couldn't save. Please try again." });
     window.location.reload(); // the map keeps your skills in its own state, so it reloads to draw the new ones
@@ -142,6 +143,15 @@ function ProfileForm({ form: { skills, cities, initial } }: { form: AnswersForm 
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <p className="text-sm font-medium">Looking for</p>
+              <Select items={LOOKING_FOR} value={lookingFor} onValueChange={(v) => v && setLookingFor(v as LookingFor)}>
+                <SelectTrigger aria-label="Looking for" className="w-full"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {LOOKING_FOR.map((l) => <SelectItem key={l.value} value={l.value}>{l.label}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
             <div className="space-y-1.5">
               <p className="text-sm font-medium">Aiming for</p>
               <Select items={ROLE_ITEMS} value={role} onValueChange={(v) => v && setRole(String(v))}>

@@ -10,12 +10,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Toggle } from "@/components/ui/toggle";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { categoryColor } from "@/lib/categories";
-import { ROLES, roleBySlug } from "@/lib/roles";
+import { LOOKING_FOR, ROLES, roleBySlug, type LookingFor } from "@/lib/roles";
 import { BrandPanel } from "@/components/brand-panel";
 
 type Skill = { id: number; slug: string; name: string; category: string | null };
 // No firstName = a guest (not signed in). Their answers go to a cookie, not the database.
-type Props = { firstName?: string; skills: Skill[]; cities: string[]; initial: { skillIds: number[]; role: string; city: string } };
+type Props = { firstName?: string; skills: Skill[]; cities: string[]; initial: { skillIds: number[]; role: string; city: string; lookingFor: LookingFor } };
 
 const STEPS = ["start", "skills", "role", "city"] as const;
 const TOP = 20; // "the 20 skills job posts ask for most": `skills` arrives sorted by job count
@@ -29,6 +29,7 @@ export function OnboardingFlow({ firstName, skills, cities, initial }: Props) {
   const [fromResume, setFromResume] = useState(false);
   const [picked, setPicked] = useState<Set<number>>(new Set(initial.skillIds));
   const [role, setRole] = useState(initial.role);
+  const [lookingFor, setLookingFor] = useState<LookingFor>(initial.lookingFor);
   const [city, setCity] = useState(initial.city);
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<{ busy: boolean; message: string }>({ busy: false, message: "" });
@@ -62,7 +63,7 @@ export function OnboardingFlow({ firstName, skills, cities, initial }: Props) {
     const res = await fetch("/api/onboarding", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ skillIds: [...picked], targetRole: role, city }),
+      body: JSON.stringify({ skillIds: [...picked], targetRole: role, city, lookingFor }),
     }).catch(() => null);
     if (!res?.ok) return setStatus({ busy: false, message: "Couldn't save. Please try again." });
     router.push("/");
@@ -89,7 +90,7 @@ export function OnboardingFlow({ firstName, skills, cities, initial }: Props) {
     skills: fromResume
       ? ["Check your skills", "We found these on your resume. Remove anything that's wrong and add what we missed."]
       : ["What have you used?", "Tap the ones you've worked with, even in a class or a side project."],
-    role: ["What role are you aiming for?", "We use it to pick the jobs you're closest to. Not sure? Any tech role works."],
+    role: ["What are you aiming for?", "We use it to pick the jobs you're closest to. Not sure? Any tech role works."],
     city: ["Where do you want to work?", "Jobs in your city show first, plus remote jobs in Canada. You can switch to all of Canada later."],
   }[STEPS[step]];
 
@@ -195,20 +196,30 @@ export function OnboardingFlow({ firstName, skills, cities, initial }: Props) {
           )}
 
           {STEPS[step] === "role" && (
-            <ToggleGroup aria-label="Target role" variant="outline" size="lg" className="flex-wrap justify-start gap-2" value={[role]}>
-              {/* Picking a role is the whole answer, so move on right away. Tapping the default works too. */}
-              {ROLES.map((r) => (
-                <ToggleGroupItem
-                  key={r.slug}
-                  type="button"
-                  value={r.slug}
-                  onClick={() => { setRole(r.slug); go(step + 1); }}
-                  className="rounded-full px-4 aria-pressed:bg-foreground aria-pressed:text-background"
-                >
-                  {r.name}
-                </ToggleGroupItem>
-              ))}
-            </ToggleGroup>
+            <div className="space-y-5">
+              {/* Internship or full-time: picking one doesn't move on, so you can still pick a role below. */}
+              <ToggleGroup aria-label="Looking for" variant="outline" className="flex-wrap justify-start gap-2" value={[lookingFor]}>
+                {LOOKING_FOR.map((l) => (
+                  <ToggleGroupItem key={l.value} type="button" value={l.value} onClick={() => setLookingFor(l.value)} className="rounded-full px-4 aria-pressed:bg-foreground aria-pressed:text-background">
+                    {l.label}
+                  </ToggleGroupItem>
+                ))}
+              </ToggleGroup>
+              <ToggleGroup aria-label="Target role" variant="outline" size="lg" className="flex-wrap justify-start gap-2" value={[role]}>
+                {/* Picking a role is the whole answer, so move on right away. Tapping the default works too. */}
+                {ROLES.map((r) => (
+                  <ToggleGroupItem
+                    key={r.slug}
+                    type="button"
+                    value={r.slug}
+                    onClick={() => { setRole(r.slug); go(step + 1); }}
+                    className="rounded-full px-4 aria-pressed:bg-foreground aria-pressed:text-background"
+                  >
+                    {r.name}
+                  </ToggleGroupItem>
+                ))}
+              </ToggleGroup>
+            </div>
           )}
 
           {STEPS[step] === "city" && (

@@ -3,36 +3,38 @@
 import { cookies, headers } from "next/headers";
 import { sql } from "./db";
 import { getProfile } from "./dashboard";
-import { ROLES } from "./roles";
+import { ROLES, lookingForFrom, type LookingFor } from "./roles";
 
-export type Answers = { skillIds: number[]; role: string; city: string | null };
+export type Answers = { skillIds: number[]; role: string; city: string | null; lookingFor: LookingFor };
 
 const COOKIE = "hp_guest";
 const MAX_SKILLS = 200; // ~1 KB of ids, far under the 4 KB cookie cap (the DB has ~70 skills)
 
 // The onboarding POST body → clean answers, or null if the skills list is bad. Unknown roles fall back to "any".
 export function answersFromBody(body: unknown): Answers | null {
-  const b = (body ?? {}) as { skillIds?: unknown; targetRole?: unknown; city?: unknown };
+  const b = (body ?? {}) as { skillIds?: unknown; targetRole?: unknown; city?: unknown; lookingFor?: unknown };
   const ids = b.skillIds;
   if (!Array.isArray(ids) || ids.length > MAX_SKILLS || !ids.every(Number.isInteger)) return null;
   const role = ROLES.some((r) => r.slug === b.targetRole) ? (b.targetRole as string) : "any";
   const city = typeof b.city === "string" ? b.city.trim().slice(0, 60) || null : null;
-  return { skillIds: [...new Set(ids as number[])], role, city }; // no duplicates: one insert can't touch a row twice
+  // No duplicates: one insert can't touch a row twice. Not saying what you're looking for = both.
+  return { skillIds: [...new Set(ids as number[])], role, city, lookingFor: lookingForFrom(b.lookingFor) };
 }
 
 // We wrote the cookie, so it must already be clean. Anything else (edited, truncated, old shape) counts as no cookie.
 export function parseGuest(raw: string | undefined): Answers | null {
   try {
     const g = JSON.parse(raw ?? "");
-    const a = answersFromBody({ skillIds: g.skillIds, targetRole: g.role, city: g.city });
-    return a && a.role === g.role && a.city === g.city ? a : null;
+    const a = answersFromBody({ skillIds: g.skillIds, targetRole: g.role, city: g.city, lookingFor: g.lookingFor });
+    // Cookies from before db/009 have no lookingFor: they still count, as "both".
+    return a && a.role === g.role && a.city === g.city && a.lookingFor === (g.lookingFor ?? "both") ? a : null;
   } catch {
     return null;
   }
 }
 
 export type Skill = { id: number; slug: string; name: string; category: string | null };
-export type AnswersForm = { skills: Skill[]; cities: string[]; initial: { skillIds: number[]; role: string; city: string } };
+export type AnswersForm = { skills: Skill[]; cities: string[]; initial: { skillIds: number[]; role: string; city: string; lookingFor: LookingFor } };
 
 // What the onboarding page and the Edit profile dialog start from: every skill (most asked for first), the cities with
 // jobs, and your answers so far (signed in: Neon; a guest: the cookie). No city yet: Vercel's IP guess, never stored
@@ -53,8 +55,8 @@ export async function getAnswersForm(sub: string | null): Promise<AnswersForm> {
     skills: [...skills],
     cities: cities.map((c) => c.city),
     initial: sub
-      ? { skillIds: mine.map((m) => m.id), role: profile?.target_role ?? "any", city: profile?.city ?? guessCity }
-      : { skillIds: guest?.skillIds ?? [], role: guest?.role ?? "any", city: guest?.city ?? guessCity },
+      ? { skillIds: mine.map((m) => m.id), role: profile?.target_role ?? "any", city: profile?.city ?? guessCity, lookingFor: lookingForFrom(profile?.looking_for) }
+      : { skillIds: guest?.skillIds ?? [], role: guest?.role ?? "any", city: guest?.city ?? guessCity, lookingFor: guest?.lookingFor ?? "both" },
   };
 }
 
@@ -85,10 +87,11 @@ export async function saveAnswers(user: { sub: string; name?: string | null; ema
   // One transaction, so a failure never leaves you with your old skills deleted and the new ones missing.
   await sql.begin(async (tx) => {
     await tx`
-      insert into profiles (user_sub, target_role, city, name, email)
-      values (${sub}, ${a.role}, ${a.city}, ${user.name ?? null}, ${user.email ?? null})
+      insert into profiles (user_sub, target_role, city, name, email, looking_for)
+      values (${sub}, ${a.role}, ${a.city}, ${user.name ?? null}, ${user.email ?? null}, ${a.lookingFor})
       on conflict (user_sub) do update
-      set target_role = excluded.target_role, city = excluded.city, name = excluded.name, email = excluded.email`;
+      set target_role = excluded.target_role, city = excluded.city, name = excluded.name, email = excluded.email,
+          looking_for = excluded.looking_for`;
     await tx`delete from user_skills where user_sub = ${sub} and status = 'have'`;
     if (rows.length) {
       await tx`insert into user_skills ${tx(rows)} on conflict (user_sub, skill_id) do update set status = 'have'`;
