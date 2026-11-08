@@ -29,10 +29,10 @@ let ai: GoogleGenAI | null = null; // created on first use, so importing this fi
 let lastCallAt = 0;
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-export async function extractSkillsBatch(jobs: JobInput[]): Promise<JobSkills[]> {
+export async function extractSkillsBatch(jobs: JobInput[], opts: GeminiOptions = {}): Promise<JobSkills[]> {
   if (jobs.length === 0) return [];
   if (jobs.length > MAX_BATCH) throw new Error(`extractSkillsBatch: max ${MAX_BATCH} jobs per call, got ${jobs.length}`);
-  const text = await callGemini(buildExtractInput(jobs), EXTRACT_SYSTEM_PROMPT, EXTRACT_SCHEMA);
+  const text = await callGemini(buildExtractInput(jobs), EXTRACT_SYSTEM_PROMPT, EXTRACT_SCHEMA, opts);
   return cleanResults(jobs, JSON.parse(text) as Partial<ExtractResult>);
 }
 
@@ -63,9 +63,21 @@ export function cleanResults(jobs: JobInput[], parsed: Partial<ExtractResult>): 
   return out; // a job missing here was not extracted; /api/extract leaves extracted = false and retries it later
 }
 
+// timeoutMs = how long ONE model gets before we give up on it and try the next one.
+// Unset = wait as long as it takes (fine on a laptop, where big batches can take minutes).
+export type GeminiOptions = { timeoutMs?: number };
+
+// Should we move on to the next model? Yes for: quota used up (429), overloaded (503),
+// or our own time limit ran out. Anything else (bad key, bad request) is a real error.
+export function shouldTryNextModel(err: unknown): boolean {
+  const e = err as { status?: number; name?: string; message?: string };
+  if (e.status === 429 || e.status === 503) return true;
+  return e.name === "AbortError" || e.name === "TimeoutError" || /timed? ?out|abort/i.test(e.message ?? "");
+}
+
 // Shared by extract.ts and extras.ts: one throttled Gemini call that must return JSON
-// matching `schema`, with the model fallback on 429.
-export async function callGemini(input: string, systemInstruction: string, schema: unknown): Promise<string> {
+// matching `schema`, falling back to the next model on quota, overload or timeout.
+export async function callGemini(input: string, systemInstruction: string, schema: unknown, opts: GeminiOptions = {}): Promise<string> {
   // v1beta: the "-latest" model aliases and responseJsonSchema only exist there, not on v1.
   ai ??= new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY, apiVersion: "v1beta" });
 
@@ -84,19 +96,17 @@ export async function callGemini(input: string, systemInstruction: string, schem
           responseMimeType: "application/json",
           responseJsonSchema: schema,
           temperature: 0, // same input → same answer, as far as the model allows
+          ...(opts.timeoutMs ? { httpOptions: { timeout: opts.timeoutMs } } : {}),
         },
       });
       return res.text ?? '{"jobs":[]}';
     } catch (err) {
-      // 429 = this model's daily quota is used up. 503 = this model is overloaded right now.
-      // Either way, try the next model. Anything else (bad key, bad request) is a real error, so stop.
-      const status = (err as { status?: number }).status;
-      if (status === 429 || status === 503) {
-        console.warn(`Gemini ${status} on ${model}, trying the next model.`);
+      if (shouldTryNextModel(err)) {
+        console.warn(`Gemini gave up on ${model} (${(err as { status?: number }).status ?? "timeout"}), trying the next model.`);
         continue;
       }
       throw err;
     }
   }
-  throw new Error("Every Gemini model is out of quota (resets 1 AM Calgary) or overloaded. Try again later.");
+  throw new Error("Every Gemini model is out of quota (resets 1 AM Calgary), overloaded, or too slow. Try again later.");
 }

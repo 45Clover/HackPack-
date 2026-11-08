@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { batchSize, cleanResults } from "./extract";
+import { batchSize, cleanResults, shouldTryNextModel } from "./extract";
 
 const jobs = [
   { id: "a", title: "Dev", description: "" },
@@ -51,4 +51,13 @@ test("?batch= picks the batch size, anything odd falls back to 20", () => {
   assert.equal(batchSize(u("?batch=500")), 20);
   assert.equal(batchSize(u("?batch=abc")), 20);
   assert.equal(batchSize(u("?batch=2.5")), 20);
+});
+
+test("falls back to the next model on quota, overload or timeout, not on real errors", () => {
+  assert.equal(shouldTryNextModel({ status: 429 }), true);
+  assert.equal(shouldTryNextModel({ status: 503 }), true);
+  assert.equal(shouldTryNextModel({ name: "AbortError", message: "This operation was aborted" }), true);
+  assert.equal(shouldTryNextModel(new Error("Request timed out after 25000ms")), true);
+  assert.equal(shouldTryNextModel({ status: 400, message: "bad request" }), false);
+  assert.equal(shouldTryNextModel({ status: 403, message: "API key invalid" }), false);
 });
