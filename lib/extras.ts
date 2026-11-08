@@ -1,5 +1,6 @@
-// Owner: AI (@tomi-alo). The "extras" on a skill page: where to learn it (Keenable),
-// how many Calgary ads mention it (Adzuna), and project ideas to prove it (Gemini).
+// Owner: AI (@tomi-alo). The "extras" on a skill page: where to learn it (Keenable)
+// and project ideas to prove it (Gemini). Job counts come from our own jobs table,
+// so there's no outside job-count API (Adzuna was dropped).
 //
 // Two rules keep this fast and cheap:
 // 1. getExtras (runs on every skill page view) NEVER calls Gemini. A few page views
@@ -13,7 +14,7 @@ export type Project = { title: string; summary: string; uses: string[] };
 export type Extras = {
   resources: { title: string; url: string }[];
   projects: Project[];
-  adzuna_count: number | null;
+  adzuna_count: null; // always null now; kept so the skill page keeps compiling until it drops that line
 };
 
 const TIMEOUT_MS = 5000; // a slow outside API must not hang the page
@@ -21,24 +22,20 @@ const TIMEOUT_MS = 5000; // a slow outside API must not hang the page
 // ---------- On page view: read the cache, fill it the first time ----------
 
 export async function getExtras(skill: { id: number; name: string }): Promise<Extras> {
-  const [cached] = await sql<Extras[]>`
-    select resources, projects, adzuna_count from skill_extras where skill_id = ${skill.id}`;
-  if (cached && cached.resources.length > 0) return cached;
+  const [cached] = await sql<{ resources: Extras["resources"]; projects: Project[] }[]>`
+    select resources, projects from skill_extras where skill_id = ${skill.id}`;
+  if (cached && cached.resources.length > 0) return { ...cached, adzuna_count: null };
 
-  // allSettled, not all: if Adzuna fails, we still show Keenable's links (and the other way round).
-  const [links, count] = await Promise.allSettled([learningLinks(skill.name), calgaryAdCount(skill.name)]);
-  const resources = links.status === "fulfilled" ? links.value : [];
-  const adzuna_count = count.status === "fulfilled" ? count.value : null;
+  // A failed or slow Keenable call just means no links this time, never a broken page.
+  const resources = await learningLinks(skill.name).catch(() => []);
 
   // Only cache a good result, so a failed fetch gets retried on the next visit.
   if (resources.length > 0) {
     await sql`
-      insert into skill_extras (skill_id, resources, adzuna_count)
-      values (${skill.id}, ${sql.json(resources)}, ${adzuna_count})
-      on conflict (skill_id) do update
-        set resources = excluded.resources, adzuna_count = excluded.adzuna_count, updated_at = now()`;
+      insert into skill_extras (skill_id, resources) values (${skill.id}, ${sql.json(resources)})
+      on conflict (skill_id) do update set resources = excluded.resources, updated_at = now()`;
   }
-  return { resources, adzuna_count, projects: cached?.projects ?? [] };
+  return { resources, projects: cached?.projects ?? [], adzuna_count: null };
 }
 
 // Keenable search: real, live links, so the AI never has to invent a URL.
@@ -52,16 +49,6 @@ async function learningLinks(name: string): Promise<Extras["resources"]> {
   if (!res.ok) throw new Error(`keenable ${res.status}`);
   const data = (await res.json()) as { results?: { title: string; url: string }[] };
   return (data.results ?? []).map((r) => ({ title: r.title, url: r.url }));
-}
-
-// Adzuna: how many Calgary job ads mention this skill right now. Null if keys are missing.
-async function calgaryAdCount(name: string): Promise<number | null> {
-  const { ADZUNA_APP_ID: id, ADZUNA_APP_KEY: key } = process.env;
-  if (!id || !key) return null;
-  const q = new URLSearchParams({ app_id: id, app_key: key, what: name, where: "Calgary", results_per_page: "1" });
-  const res = await fetch(`https://api.adzuna.com/v1/api/jobs/ca/search/1?${q}`, { signal: AbortSignal.timeout(TIMEOUT_MS) });
-  if (!res.ok) throw new Error(`adzuna ${res.status}`);
-  return ((await res.json()) as { count?: number }).count ?? null;
 }
 
 // ---------- Run once by hand (POST /api/extras): project ideas for the top skills ----------
