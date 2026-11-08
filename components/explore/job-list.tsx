@@ -1,6 +1,7 @@
 "use client";
 // /explore's list: every mapped job with its skills, filtered by job type and a search over title, company and skills.
-// The map above it (the landing's 3D map) draws the same filtered jobs, up to the newest 40 so it stays readable.
+// The map above it (the landing's 3D map) draws the same filtered jobs, up to the newest 40 so it stays readable:
+// full screen width over the landing's shader, so the top of the page feels like the landing hero.
 // Must-have skills come first and are solid; nice-to-haves are outlined. Each skill opens its Learning guide.
 import { useDeferredValue, useMemo, useState } from "react";
 import Link from "next/link";
@@ -10,6 +11,7 @@ import { categoryColor } from "@/lib/categories";
 import { JOB_TYPES, type JobType } from "@/lib/roles";
 import { CompanyLogo } from "@/components/dashboard/icons";
 import { HeroMap } from "@/components/landing/hero-map";
+import { HeroShader } from "@/components/landing/hero-shader";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
@@ -23,7 +25,7 @@ export type ListJob = {
 const CHIPS = 8; // more than that and a row turns into a wall of chips
 const GRAPH_JOBS = 40; // all 141 at once is a hairball
 
-export function JobList({ jobs }: { jobs: ListJob[] }) {
+export function JobList({ jobs, intro }: { jobs: ListJob[]; intro: React.ReactNode }) {
   const [type, setType] = useState<JobType>("all");
   const [query, setQuery] = useState("");
   const q = query.trim().toLowerCase();
@@ -45,37 +47,41 @@ export function JobList({ jobs }: { jobs: ListJob[] }) {
 
   return (
     <section aria-label="Mapped jobs" className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center gap-3">
-        <ToggleGroup aria-label="Job type" value={[type]} onValueChange={(v) => v[0] && setType(v[0] as JobType)} className="flex-wrap justify-start gap-1.5">
-          {JOB_TYPES.map((t) => (
-            <ToggleGroupItem key={t.value} value={t.value} className="h-9 rounded-full px-3.5 aria-pressed:bg-foreground aria-pressed:text-background">
-              {t.label}
-            </ToggleGroupItem>
-          ))}
-        </ToggleGroup>
-        <Input
-          type="search"
-          aria-label="Search jobs, companies and skills"
-          placeholder="Search a job, company or skill"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          className="h-9 w-full rounded-full bg-white px-4 sm:w-auto sm:min-w-0 sm:max-w-xs sm:flex-1"
-        />
-        <p role="status" className="text-sm text-muted-foreground tabular-nums sm:ml-auto">{shown.length} {shown.length === 1 ? "job" : "jobs"}</p>
-      </div>
+      <div className="relative isolate flex flex-col gap-8 pt-8">
+        <HeroShader />
+        {intro}
+        <div className="flex flex-wrap items-center gap-3">
+          <ToggleGroup aria-label="Job type" value={[type]} onValueChange={(v) => v[0] && setType(v[0] as JobType)} className="flex-wrap justify-start gap-1.5">
+            {JOB_TYPES.map((t) => (
+              <ToggleGroupItem key={t.value} value={t.value} className="h-9 rounded-full px-3.5 aria-pressed:bg-foreground aria-pressed:text-background">
+                {t.label}
+              </ToggleGroupItem>
+            ))}
+          </ToggleGroup>
+          <Input
+            type="search"
+            aria-label="Search jobs, companies and skills"
+            placeholder="Search a job, company or skill"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            className="h-9 w-full rounded-full bg-white px-4 sm:w-auto sm:min-w-0 sm:max-w-xs sm:flex-1"
+          />
+          <p role="status" className="text-sm text-muted-foreground tabular-nums sm:ml-auto">{shown.length} {shown.length === 1 ? "job" : "jobs"}</p>
+        </div>
 
-      {/* Job titles stay off the map (the list below names them); skill names show. */}
-      {shown.length > 0 && (
-        <figure className="relative flex flex-col gap-2 [&_.graph-label[data-kind=job]]:hidden">
-          <div className="h-[360px] sm:h-[440px] lg:h-[520px]">
-            <HeroMap jobs={graph.jobs} links={graph.links} />
-          </div>
-          <figcaption className="px-2 text-xs leading-relaxed text-muted-foreground">
-            {shown.length > GRAPH_JOBS ? `The ${GRAPH_JOBS} newest of these jobs` : shown.length === 1 ? "This job" : `These ${shown.length} jobs`}{" "}
-            (<span className="text-foreground">diamonds</span>) and the skills they ask for (<span className="text-foreground">rings</span>). Click a skill to open its guide.
-          </figcaption>
-        </figure>
-      )}
+        {/* Full screen width, most of its height. Job titles stay off the map (the list below names them). */}
+        {shown.length > 0 && (
+          <figure className="relative left-1/2 flex w-screen -translate-x-1/2 flex-col gap-2 [&_.graph-label[data-kind=job]]:hidden">
+            <div className="h-[64svh] min-h-[420px] lg:h-[80svh]">
+              <HeroMap refit jobs={graph.jobs} links={graph.links} className="[mask-image:radial-gradient(ellipse_at_center,black_60%,transparent_100%)]" />
+            </div>
+            <figcaption className="mx-auto max-w-[calc(100%-32px)] px-2 text-xs leading-relaxed text-muted-foreground lg:pointer-events-none lg:absolute lg:bottom-6 lg:left-1/2 lg:-translate-x-1/2 lg:rounded-full lg:bg-white lg:px-3.5 lg:py-1.5 lg:shadow-sm">
+              {shown.length > GRAPH_JOBS ? `The ${GRAPH_JOBS} newest of these jobs` : shown.length === 1 ? "This job" : `These ${shown.length} jobs`}{" "}
+              (<span className="text-foreground">diamonds</span>) and the skills they ask for (<span className="text-foreground">rings</span>). Click a skill to open its guide.
+            </figcaption>
+          </figure>
+        )}
+      </div>
 
       <ol className="surface flex flex-col p-2">
         {shown.map((j) => (

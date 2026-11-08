@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { GraphJob, GraphLink } from "@/lib/dashboard";
 import type { GLink, GNode } from "@/components/dashboard/graph-3d";
+import { cn } from "cn";
 import { GraphBoundary } from "@/components/dashboard/graph-boundary";
 
 const Graph3D = dynamic(() => import("@/components/dashboard/graph-3d"), {
@@ -14,7 +15,8 @@ const Graph3D = dynamic(() => import("@/components/dashboard/graph-3d"), {
 const none = new Set<string>();
 const noop = () => {};
 
-export function HeroMap({ jobs, links }: { jobs: GraphJob[]; links: GraphLink[] }) {
+// `className` overrides the frame, e.g. /explore's full-screen map with a softer edge fade.
+export function HeroMap({ jobs, links, className, refit }: { jobs: GraphJob[]; links: GraphLink[]; className?: string; refit?: boolean }) {
   const router = useRouter();
   const box = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
@@ -43,12 +45,13 @@ export function HeroMap({ jobs, links }: { jobs: GraphJob[]; links: GraphLink[] 
     <div
       ref={box}
       // The map has no box of its own: its edges fade out into the hero's shader gradient.
-      className="pointer-events-none relative h-full w-full overflow-hidden [mask-image:radial-gradient(closest-side,black_70%,transparent)] lg:pointer-events-auto"
+      className={cn("pointer-events-none relative h-full w-full overflow-hidden [mask-image:radial-gradient(closest-side,black_70%,transparent)] lg:pointer-events-auto", className)}
     >
       {size.width > 0 && (
         <GraphBoundary>
           <Graph3D
             autoRotate
+            refit={refit}
             zoom={null}
             onZoom={noop}
             data={data}
