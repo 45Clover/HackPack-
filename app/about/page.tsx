@@ -11,6 +11,7 @@ export default function About() {
       </ul>
       <h2 className="text-xl font-semibold">What we store about you</h2>
       <p>Your sign-in ID, your name and email from that sign-in, your target role and city, and the skills you save. Never your resume: we read it in memory and throw it away. Before you sign in we store nothing; your answers wait in a cookie on your own browser. We guess your city from your connection to pick a default view, and we never store that guess. &quot;Delete my data&quot; removes everything.</p>
+      <p>If you join the waitlist, we use your email only to tell you once when Skilltri opens, and we never share it.</p>
     </main>
   );
 }
