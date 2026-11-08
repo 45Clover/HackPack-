@@ -18,15 +18,16 @@ export function batchSize(url: string): number {
   const n = Number(new URL(url).searchParams.get("batch"));
   return Number.isInteger(n) && n >= 1 && n <= MAX_BATCH ? n : MAX_BATCH;
 }
-// Each model has its own daily quota. When the main one is used up or overloaded, try the lighter one.
+// Each model has its own daily quota (20 calls on the free tier). When one is used up, overloaded
+// or slow, try the next. gemini-2.5-flash is older and less busy: a third 20 calls a day.
 // Pinned names (not "-latest" aliases), so the model can't silently change under us mid-demo.
-const MODELS = ["gemini-3.8-flash", "gemini-3.5-flash-lite"];
-const MIN_GAP_MS = 13_000; // free tier allows 5 requests per minute → at most one call every 12 s
+const MODELS = ["gemini-3.8-flash", "gemini-3.5-flash-lite", "gemini-2.5-flash"];
+const MIN_GAP_MS = 13_000; // free tier allows 5 requests per minute PER MODEL → one call every 12 s per model
 
 const CATEGORY_SLUGS = new Set<string>(CATEGORIES.map((c) => c.slug));
 
 let ai: GoogleGenAI | null = null; // created on first use, so importing this file never needs the key
-let lastCallAt = 0;
+const lastCallAt = new Map<string, number>(); // per model, because the 5-per-minute limit is per model
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export async function extractSkillsBatch(jobs: JobInput[], opts: GeminiOptions = {}): Promise<JobSkills[]> {
@@ -63,9 +64,21 @@ export function cleanResults(jobs: JobInput[], parsed: Partial<ExtractResult>): 
   return out; // a job missing here was not extracted; /api/extract leaves extracted = false and retries it later
 }
 
-// timeoutMs = how long ONE model gets before we give up on it and try the next one.
-// Unset = wait as long as it takes (fine on a laptop, where big batches can take minutes).
-export type GeminiOptions = { timeoutMs?: number };
+// timeoutMs = the most ONE model gets before we give up on it and try the next one.
+// totalMs   = the most the WHOLE call gets, across all models (Vercel stops us at 60 s).
+// Both unset = wait as long as it takes (fine on a laptop, where big batches can take minutes).
+export type GeminiOptions = { timeoutMs?: number; totalMs?: number };
+
+const MIN_ATTEMPT_MS = 5_000; // less time than this left → don't bother starting another model
+
+// How long the next model may take: its own limit, cut down to whatever is left of the total.
+// undefined = no limit. null = not enough time left, stop trying.
+export function attemptTimeout(startedAt: number, now: number, opts: GeminiOptions): number | undefined | null {
+  if (!opts.totalMs) return opts.timeoutMs;
+  const left = startedAt + opts.totalMs - now;
+  if (left < MIN_ATTEMPT_MS) return null;
+  return Math.min(opts.timeoutMs ?? left, left);
+}
 
 // Should we move on to the next model? Yes for: quota used up (429), overloaded (503),
 // Google ran past our deadline (504 DEADLINE_EXCEEDED, seen live on Vercel), or our own
@@ -82,11 +95,15 @@ export async function callGemini(input: string, systemInstruction: string, schem
   // v1beta: the "-latest" model aliases and responseJsonSchema only exist there, not on v1.
   ai ??= new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY, apiVersion: "v1beta" });
 
+  const startedAt = Date.now();
   for (const model of MODELS) {
-    // Throttle: wait until at least MIN_GAP_MS has passed since the last call.
-    const wait = lastCallAt + MIN_GAP_MS - Date.now();
+    // Throttle: wait until at least MIN_GAP_MS has passed since this model's last call.
+    const wait = (lastCallAt.get(model) ?? 0) + MIN_GAP_MS - Date.now();
     if (wait > 0) await sleep(wait);
-    lastCallAt = Date.now();
+
+    const timeout = attemptTimeout(startedAt, Date.now(), opts);
+    if (timeout === null) break; // out of time: report failure now, before Vercel cuts us off
+    lastCallAt.set(model, Date.now());
 
     try {
       const res = await ai.models.generateContent({
@@ -97,7 +114,7 @@ export async function callGemini(input: string, systemInstruction: string, schem
           responseMimeType: "application/json",
           responseJsonSchema: schema,
           temperature: 0, // same input → same answer, as far as the model allows
-          ...(opts.timeoutMs ? { httpOptions: { timeout: opts.timeoutMs } } : {}),
+          ...(timeout ? { httpOptions: { timeout } } : {}),
         },
       });
       return res.text ?? '{"jobs":[]}';

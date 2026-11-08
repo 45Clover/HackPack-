@@ -31,10 +31,10 @@ export async function POST(request: Request) {
   // 2. ONE Gemini call for the whole batch.
   let results;
   try {
-    // On Vercel (it sets VERCEL=1), give each model 25 s: Flash 25 s + Flash-Lite 25 s fits inside the 60 s limit.
-    // On a laptop, no limit: big catch-up batches can take minutes.
-    const timeoutMs = process.env.VERCEL ? 25_000 : undefined;
-    results = await extractSkillsBatch(todo.map(({ id, title, description }) => ({ id, title, description })), { timeoutMs });
+    // On Vercel (it sets VERCEL=1): each model gets up to 25 s, and all models together get 55 s,
+    // leaving ~5 s to save to Neon before Vercel's 60 s limit. On a laptop: no limits at all.
+    const limits = process.env.VERCEL ? { timeoutMs: 25_000, totalMs: 55_000 } : {};
+    results = await extractSkillsBatch(todo.map(({ id, title, description }) => ({ id, title, description })), limits);
   } catch (err) {
     console.error("extract: Gemini failed", err);
     // 502 = "the service behind me failed". Nothing was saved, so the same jobs get retried next time.
