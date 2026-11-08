@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "HackPack",
+  title: "Skilltri",
   description: "The tech skills Canadian companies are hiring for right now, from real job posts.",
 };
 

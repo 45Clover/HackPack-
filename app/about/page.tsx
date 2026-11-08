@@ -2,7 +2,7 @@
 export default function About() {
   return (
     <main className="prose max-w-2xl space-y-4">
-      <h1 className="text-3xl font-semibold tracking-tight">How HackPack works</h1>
+      <h1 className="text-3xl font-semibold tracking-tight">How Skilltri works</h1>
       <p>We read real job posts from companies&apos; own public job feeds every morning, pull out the skills they ask for, and map them.</p>
       <h2 className="text-xl font-semibold">Where we use AI</h2>
       <ul className="list-disc pl-5">
