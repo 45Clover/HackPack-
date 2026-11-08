@@ -102,7 +102,7 @@ export function OnboardingFlow({ firstName, skills, cities, initial }: Props) {
 
       <section className="flex min-h-dvh flex-col px-6 py-8 md:px-16 md:py-10">
         <div className="flex items-center gap-4">
-          <span className="text-[15px] font-semibold tracking-tight md:hidden">Skilltri</span>
+          <span className="text-[15px] font-semibold tracking-tight md:hidden">Skilltrii</span>
           <Progress value={((step + 1) / STEPS.length) * 100} aria-label={`Step ${step + 1} of ${STEPS.length}`} className="ml-auto w-32 md:ml-0" />
           <span className="text-sm text-muted-foreground tabular-nums">{step + 1} / {STEPS.length}</span>
         </div>

@@ -13,9 +13,16 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const description = "The tech skills Canadian companies are hiring for right now, from real job posts. See the jobs you're closest to, and the one skill that gets you closer.";
+
+// Link previews (iMessage, Discord, LinkedIn…): this title and description, plus app/opengraph-image.jpg, a snapshot of
+// the landing page's hero.
 export const metadata: Metadata = {
-  title: "Skilltri",
-  description: "The tech skills Canadian companies are hiring for right now, from real job posts.",
+  metadataBase: new URL("https://www.skilltrii.work"),
+  title: "Skilltrii",
+  description,
+  openGraph: { title: "Skilltrii", description, url: "/", siteName: "Skilltrii", type: "website", locale: "en_CA" },
+  twitter: { card: "summary_large_image", title: "Skilltrii", description },
 };
 
 // `drawer` is the @drawer slot: the Learning guide slides up there when opened from inside the app.

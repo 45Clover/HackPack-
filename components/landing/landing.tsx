@@ -168,7 +168,7 @@ export async function Landing({ searchParams }: { searchParams: SearchParams }) 
         <div className="flex flex-col gap-4 lg:pt-6">
           <h2 id="early" data-reveal className="text-3xl font-semibold tracking-tight text-balance lg:text-4xl">Get early access</h2>
           <p data-reveal className="max-w-[44ch] leading-relaxed text-muted-foreground">
-            Skilltri is in beta, built at Hack the Change 2026, and internships are coming. Join to hear the day it opens.
+            Skilltrii is in beta, built at Hack the Change 2026, and internships are coming. Join to hear the day it opens.
           </p>
           {waitlist.count >= 10 && (
             <p data-reveal className="text-sm text-muted-foreground tabular-nums">{waitlist.count.toLocaleString("en-CA")} people have joined</p>
